@@ -1,27 +1,35 @@
 # caption.py
-from transformers import BlipProcessor, BlipForConditionalGeneration
-from PIL import Image
 
-# Load BLIP model
-processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
-blip = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
+import requests
+import base64
 
-def caption_objects(image_path, boxes):
-    image = Image.open(image_path).convert('RGB')
-    captions = []
+def generate_caption(image_path):
+    """
+    Example: using local Ollama LLaMA3.2 or phi4 to caption image
+    But Ollama does NOT do direct image input — so we use a simple workaround:
+    - convert image to base64
+    - prompt the local LLM with a description prompt
+    """
 
-    for i, box in enumerate(boxes):
-        x1, y1, x2, y2 = map(int, box)
-        crop = image.crop((x1, y1, x2, y2))
+    # Convert image to base64 string (optional, or describe filename)
+    with open(image_path, "rb") as f:
+        img_bytes = f.read()
+    encoded = base64.b64encode(img_bytes).decode('utf-8')
 
-        inputs = processor(images=crop, return_tensors="pt")
-        out = blip.generate(**inputs, max_new_tokens=50)
-        caption = processor.decode(out[0], skip_special_tokens=True)
+    prompt = f"""You are an image captioning assistant.
+    Here is an image in base64:
+    {encoded[:100]}... (truncated)
 
-        captions.append({
-            "object_id": i + 1,
-            "box": [x1, y1, x2, y2],
-            "caption": caption
-        })
+    Based on this, write a detailed caption describing everything you can see."""
 
-    return captions
+    response = requests.post(
+        "http://localhost:11434/api/generate",
+        json={"model": "llama3.2:3b", "prompt": prompt},
+        stream=False
+    )
+
+    if response.ok:
+        result = response.text
+        return result
+    else:
+        return "❌ Captioning failed: check Ollama is running."

@@ -1,25 +1,17 @@
-# main.py
 from detect import detect_objects
-from caption import caption_objects
+from caption import generate_captions
 from analyze import analyze_bias
-import json
+from save_results import save_results
 
-if __name__ == "__main__":
-    image_path = "image 2.jpg"
+IMAGE_PATH = "image 2.jpg"
 
-    # Step 1: Detect
-    boxes = detect_objects(image_path)
-    print(f"📦 Detected {len(boxes)} objects")
-
-    # Step 2: Caption
-    captions = caption_objects(image_path, boxes)
-    print("📸 Captions:\n", json.dumps(captions, indent=2))
-
-    # Step 3: Analyze with Ollama
-    summary = analyze_bias(captions)
-    print("\n🧩 Ollama Bias Summary:\n", summary)
-    
+boxes = detect_objects(IMAGE_PATH)
 print("✅ Detected boxes:", boxes)
-print("✅ Generated captions:", captions)
-print("✅ Ollama output:", summary)
 
+captions = generate_captions(IMAGE_PATH, boxes)
+print("✅ Generated captions:", captions)
+
+analysis = analyze_bias(captions)
+print("✅ Ollama output:", analysis)
+
+save_results(captions, analysis)
