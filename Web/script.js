@@ -12,17 +12,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const targetingSection = document.getElementById('targetingSection');
     const ageMin = document.getElementById('ageMin');
     const ageMax = document.getElementById('ageMax');
+    const chartsContainer = document.getElementById('chartsContainer');
     
     // Chart instances
-    let ageChart, genderChart, locationChart;
+    let charts = {};
     
     // Data storage
     let csvData = [];
-    let sensitiveParams = {
-        age: { name: 'Age', data: {} },
-        gender: { name: 'Gender', data: {} },
-        location: { name: 'Location', data: {} }
-    };
+    let sensitiveParams = {};
     let targetingInfo = {
         gender: 'both',
         ageMin: 18,
@@ -37,11 +34,35 @@ document.addEventListener('DOMContentLoaded', function() {
         parameterStats: {}
     };
 
+    // Common parameter name mappings
+    const parameterMappings = {
+        age: ['age', 'years', 'yrs', 'year'],
+        gender: ['gender', 'sex', 'male/female', 'm/f'],
+        location: ['location', 'city', 'state', 'country', 'region', 'address'],
+        religion: ['religion', 'faith', 'belief', 'denomination'],
+        race: ['race', 'ethnicity', 'ethnic'],
+        disability: ['disability', 'disabled', 'handicap'],
+        occupation: ['occupation', 'job', 'profession', 'work'],
+        income: ['income', 'salary', 'wage', 'earnings'],
+        education: ['education', 'degree', 'qualification'],
+        marital: ['marital', 'maritalstatus', 'relationshipstatus']
+    };
+
+    // Initialize targeting info from inputs
+    function updateTargetingInfoFromInputs() {
+    const genderRadio = document.querySelector('input[name="gender"]:checked');
+    targetingInfo.gender = genderRadio ? genderRadio.value : 'both';
+    targetingInfo.ageMin = parseInt(ageMin.value) || 18;
+    targetingInfo.ageMax = parseInt(ageMax.value) || 65;
+}
+
     // Event Listeners
-    csvFileInput.addEventListener('change', handleFileSelect);
-    analyzeBtn.addEventListener('click', analyzeData);
-    generateReportBtn.addEventListener('click', generatePDFReport);
-    
+csvFileInput.addEventListener('change', handleFileSelect);
+analyzeBtn.addEventListener('click', function() {
+    updateTargetingInfoFromInputs(); // Update targeting info before analysis
+    analyzeData();
+});
+
     // Set up radio button listeners
     document.querySelectorAll('input[name="gender"]').forEach(radio => {
         radio.addEventListener('change', function() {
@@ -52,12 +73,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Set up age range listeners
     ageMin.addEventListener('change', function() {
-        targetingInfo.ageMin = parseInt(this.value) || 0;
+        targetingInfo.ageMin = parseInt(this.value) || 18;
         updateAnalysis();
     });
     
     ageMax.addEventListener('change', function() {
-        targetingInfo.ageMax = parseInt(this.value) || 100;
+        targetingInfo.ageMax = parseInt(this.value) || 65;
         updateAnalysis();
     });
 
@@ -82,89 +103,231 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     async function analyzeData() {
-        const file = csvFileInput.files[0];
-        if (!file) return;
+    const file = csvFileInput.files[0];
+    if (!file) return;
+    
+    loadingSection.classList.remove('hidden');
+    dataSection.classList.add('hidden');
+    
+    try {
+        const text = await readFileAsText(file);
+        csvData = parseCSV(text);
         
-        loadingSection.classList.remove('hidden');
-        dataSection.classList.add('hidden');
+        // Update targeting info from current input values
+        updateTargetingInfoFromInputs();
         
-        try {
-            const text = await readFileAsText(file);
-            csvData = parseCSV(text);
+        // Reset and detect sensitive parameters
+        sensitiveParams = {};
+        detectSensitiveParameters();
+        
+        // Initialize analysis results with proper structure
+        analysisResults = {
+            totalRecords: csvData.length,
+            matchedRecords: 0,
+            genderMatch: 0,
+            ageMatch: 0,
+            matchScore: 0,
+            parameterStats: {}
+        };
+        
+        // Process data and calculate statistics
+        processDataAndCalculateStats();
+        
+        // Now calculate the match score
+        analyzeDataMatch();
+        
+        // Update UI
+        createCharts();
+        generateInsights();
+        updateMatchScoreDisplay();
+        
+        loadingSection.classList.add('hidden');
+        dataSection.classList.remove('hidden');
+    } catch (error) {
+        console.error('Error analyzing data:', error);
+        loadingSection.classList.add('hidden');
+        alert('Error analyzing data. Please check the file format and try again.');
+    }
+}
+
+function processDataAndCalculateStats() {
+    // Reset parameter stats
+    analysisResults.parameterStats = {};
+    
+    csvData.forEach(record => {
+        // Process each detected sensitive parameter
+        Object.entries(sensitiveParams).forEach(([paramType, paramInfo]) => {
+            const paramName = paramInfo.name;
+            const paramValue = record[paramName];
             
-            // Update targeting info from inputs
-            targetingInfo.ageMin = parseInt(ageMin.value) || 0;
-            targetingInfo.ageMax = parseInt(ageMax.value) || 100;
+            if (paramValue === undefined || paramValue === '') return;
             
-            // Reset sensitive params data
-            Object.keys(sensitiveParams).forEach(key => {
-                sensitiveParams[key].data = {};
-            });
+            // Initialize stats if not exists
+            if (!analysisResults.parameterStats[paramType]) {
+                analysisResults.parameterStats[paramType] = {};
+            }
             
-            // Collect parameter statistics
-            analysisResults.parameterStats = {};
-            csvData.forEach(record => {
-                // Age stats
-                const age = parseInt(record.age) || 0;
+            // Special handling for age
+            if (paramType === 'age') {
+                const age = parseInt(paramValue) || 0;
                 if (!isNaN(age)) {
                     const ageGroup = Math.floor(age / 10) * 10;
                     const ageRange = `${ageGroup}-${ageGroup + 9}`;
                     sensitiveParams.age.data[ageRange] = (sensitiveParams.age.data[ageRange] || 0) + 1;
                     
-                    if (!analysisResults.parameterStats.age) {
-                        analysisResults.parameterStats.age = {
+                    if (!analysisResults.parameterStats.age.stats) {
+                        analysisResults.parameterStats.age.stats = {
                             min: age,
                             max: age,
                             sum: age,
                             count: 1
                         };
                     } else {
-                        analysisResults.parameterStats.age.min = Math.min(analysisResults.parameterStats.age.min, age);
-                        analysisResults.parameterStats.age.max = Math.max(analysisResults.parameterStats.age.max, age);
-                        analysisResults.parameterStats.age.sum += age;
-                        analysisResults.parameterStats.age.count++;
+                        analysisResults.parameterStats.age.stats.min = Math.min(
+                            analysisResults.parameterStats.age.stats.min, age);
+                        analysisResults.parameterStats.age.stats.max = Math.max(
+                            analysisResults.parameterStats.age.stats.max, age);
+                        analysisResults.parameterStats.age.stats.sum += age;
+                        analysisResults.parameterStats.age.stats.count++;
                     }
                 }
+            } 
+            // Special handling for gender
+            else if (paramType === 'gender') {
+                const gender = paramValue.toLowerCase();
+                sensitiveParams.gender.data[gender] = (sensitiveParams.gender.data[gender] || 0) + 1;
+                analysisResults.parameterStats.gender[gender] = 
+                    (analysisResults.parameterStats.gender[gender] || 0) + 1;
+            }
+            // For all other parameters
+            else {
+                const value = paramValue.toString().toLowerCase();
+                sensitiveParams[paramType].data[value] = 
+                    (sensitiveParams[paramType].data[value] || 0) + 1;
                 
-                // Gender stats
-                if (record.gender) {
-                    const gender = record.gender.toLowerCase();
+                analysisResults.parameterStats[paramType][value] = 
+                    (analysisResults.parameterStats[paramType][value] || 0) + 1;
+            }
+        });
+    });
+    
+    // Calculate average age if available
+    if (analysisResults.parameterStats.age?.stats) {
+        const ageStats = analysisResults.parameterStats.age.stats;
+        ageStats.avg = Math.round(ageStats.sum / ageStats.count);
+    }
+}
+
+function updateTargetingInfoFromInputs() {
+    const genderRadio = document.querySelector('input[name="gender"]:checked');
+    targetingInfo.gender = genderRadio ? genderRadio.value : 'both';
+    targetingInfo.ageMin = parseInt(ageMin.value) || 18;
+    targetingInfo.ageMax = parseInt(ageMax.value) || 65;
+}
+    
+    function detectSensitiveParameters() {
+        sensitiveParams = {};
+        
+        if (csvData.length === 0) return;
+        
+        const firstRecord = csvData[0];
+        const headers = Object.keys(firstRecord);
+        
+        // Detect each parameter type based on common name patterns
+        for (const [paramType, patterns] of Object.entries(parameterMappings)) {
+            for (const header of headers) {
+                const headerLower = header.toLowerCase();
+                if (patterns.some(pattern => headerLower.includes(pattern))) {
+                    if (!sensitiveParams[paramType]) {
+                        sensitiveParams[paramType] = {
+                            name: header,
+                            data: {}
+                        };
+                    }
+                    break;
+                }
+            }
+        }
+        
+        // For any remaining headers, add them as generic parameters
+        headers.forEach(header => {
+            const headerLower = header.toLowerCase();
+            const isMapped = Object.values(parameterMappings).some(patterns => 
+                patterns.some(pattern => headerLower.includes(pattern)));
+            
+            if (!isMapped) {
+                sensitiveParams[header] = {
+                    name: header,
+                    data: {}
+                };
+            }
+        });
+    }
+    
+    function collectParameterStatistics() {
+        analysisResults.parameterStats = {};
+        
+        csvData.forEach(record => {
+            // Process each detected sensitive parameter
+            Object.entries(sensitiveParams).forEach(([paramType, paramInfo]) => {
+                const paramName = paramInfo.name;
+                const paramValue = record[paramName];
+                
+                if (paramValue === undefined || paramValue === '') return;
+                
+                // Initialize stats if not exists
+                if (!analysisResults.parameterStats[paramType]) {
+                    analysisResults.parameterStats[paramType] = {};
+                }
+                
+                // Special handling for age
+                if (paramType === 'age') {
+                    const age = parseInt(paramValue) || 0;
+                    if (!isNaN(age)) {
+                        const ageGroup = Math.floor(age / 10) * 10;
+                        const ageRange = `${ageGroup}-${ageGroup + 9}`;
+                        sensitiveParams.age.data[ageRange] = (sensitiveParams.age.data[ageRange] || 0) + 1;
+                        
+                        if (!analysisResults.parameterStats.age.stats) {
+                            analysisResults.parameterStats.age.stats = {
+                                min: age,
+                                max: age,
+                                sum: age,
+                                count: 1
+                            };
+                        } else {
+                            analysisResults.parameterStats.age.stats.min = Math.min(
+                                analysisResults.parameterStats.age.stats.min, age);
+                            analysisResults.parameterStats.age.stats.max = Math.max(
+                                analysisResults.parameterStats.age.stats.max, age);
+                            analysisResults.parameterStats.age.stats.sum += age;
+                            analysisResults.parameterStats.age.stats.count++;
+                        }
+                    }
+                } 
+                // Special handling for gender
+                else if (paramType === 'gender') {
+                    const gender = paramValue.toLowerCase();
                     sensitiveParams.gender.data[gender] = (sensitiveParams.gender.data[gender] || 0) + 1;
-                    
-                    if (!analysisResults.parameterStats.gender) {
-                        analysisResults.parameterStats.gender = {};
-                    }
-                    analysisResults.parameterStats.gender[gender] = (analysisResults.parameterStats.gender[gender] || 0) + 1;
+                    analysisResults.parameterStats.gender[gender] = 
+                        (analysisResults.parameterStats.gender[gender] || 0) + 1;
                 }
-                
-                // Location stats
-                if (record.location) {
-                    const location = record.location.toLowerCase();
-                    sensitiveParams.location.data[location] = (sensitiveParams.location.data[location] || 0) + 1;
+                // For all other parameters
+                else {
+                    const value = paramValue.toString().toLowerCase();
+                    sensitiveParams[paramType].data[value] = 
+                        (sensitiveParams[paramType].data[value] || 0) + 1;
                     
-                    if (!analysisResults.parameterStats.location) {
-                        analysisResults.parameterStats.location = {};
-                    }
-                    analysisResults.parameterStats.location[location] = (analysisResults.parameterStats.location[location] || 0) + 1;
+                    analysisResults.parameterStats[paramType][value] = 
+                        (analysisResults.parameterStats[paramType][value] || 0) + 1;
                 }
             });
-            
-            // Calculate average age
-            if (analysisResults.parameterStats.age) {
-                analysisResults.parameterStats.age.avg = 
-                    Math.round(analysisResults.parameterStats.age.sum / analysisResults.parameterStats.age.count);
-            }
-            
-            analyzeDataMatch();
-            createCharts();
-            generateInsights();
-            
-            loadingSection.classList.add('hidden');
-            dataSection.classList.remove('hidden');
-        } catch (error) {
-            console.error('Error analyzing data:', error);
-            loadingSection.classList.add('hidden');
-            alert('Error analyzing data. Please check the file format and try again.');
+        });
+        
+        // Calculate average age if available
+        if (analysisResults.parameterStats.age?.stats) {
+            const ageStats = analysisResults.parameterStats.age.stats;
+            ageStats.avg = Math.round(ageStats.sum / ageStats.count);
         }
     }
     
@@ -179,7 +342,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function parseCSV(text) {
         const lines = text.split('\n').filter(line => line.trim());
-        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const headers = lines[0].split(',').map(h => h.trim());
         
         return lines.slice(1).map(line => {
             const values = line.split(',');
@@ -197,14 +360,21 @@ document.addEventListener('DOMContentLoaded', function() {
         let bothMatchCount = 0;
         
         csvData.forEach(record => {
-            // Check gender match
-            const gender = record.gender ? record.gender.toLowerCase() : '';
-            const genderMatch = targetingInfo.gender === 'both' || 
-                              gender === targetingInfo.gender;
+            // Check gender match if gender parameter exists
+            let genderMatch = true;
+            if (sensitiveParams.gender) {
+                const gender = record[sensitiveParams.gender.name] ? 
+                    record[sensitiveParams.gender.name].toLowerCase() : '';
+                genderMatch = targetingInfo.gender === 'both' || 
+                            gender === targetingInfo.gender;
+            }
             
-            // Check age match
-            const age = parseInt(record.age) || 0;
-            const ageMatch = age >= targetingInfo.ageMin && age <= targetingInfo.ageMax;
+            // Check age match if age parameter exists
+            let ageMatch = true;
+            if (sensitiveParams.age) {
+                const age = parseInt(record[sensitiveParams.age.name]) || 0;
+                ageMatch = age >= targetingInfo.ageMin && age <= targetingInfo.ageMax;
+            }
             
             if (genderMatch) genderMatchCount++;
             if (ageMatch) ageMatchCount++;
@@ -244,35 +414,81 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function createCharts() {
-        if (ageChart) ageChart.destroy();
-        if (genderChart) genderChart.destroy();
-        if (locationChart) locationChart.destroy();
+        // Clear existing charts
+        Object.values(charts).forEach(chart => chart.destroy());
+        charts = {};
         
-        // Age Chart
-        const ageCtx = document.getElementById('ageChart').getContext('2d');
-        ageChart = new Chart(ageCtx, createBarChartConfig(
-            'Age Distribution', 
-            Object.keys(sensitiveParams.age.data), 
-            Object.values(sensitiveParams.age.data),
-            'rgba(54, 162, 235, 0.7)'
-        ));
+        // Clear existing chart cards (except the first three)
+        const chartCards = chartsContainer.querySelectorAll('.chart-card');
+        for (let i = 3; i < chartCards.length; i++) {
+            chartCards[i].remove();
+        }
         
-        // Gender Chart
-        const genderCtx = document.getElementById('genderChart').getContext('2d');
-        genderChart = new Chart(genderCtx, createPieChartConfig(
-            'Gender Distribution', 
-            Object.keys(sensitiveParams.gender.data), 
-            Object.values(sensitiveParams.gender.data)
-        ));
+        // Create charts for detected parameters (max 6 to avoid clutter)
+        const paramsToChart = Object.keys(sensitiveParams).slice(0, 6);
         
-        // Location Chart
-        const locationCtx = document.getElementById('locationChart').getContext('2d');
-        locationChart = new Chart(locationCtx, createBarChartConfig(
-            'Top Locations', 
-            getTopItems(sensitiveParams.location.data, 5).labels,
-            getTopItems(sensitiveParams.location.data, 5).values,
-            'rgba(75, 192, 192, 0.7)'
-        ));
+        paramsToChart.forEach((paramType, index) => {
+            const paramInfo = sensitiveParams[paramType];
+            const paramData = paramInfo.data;
+            
+            // Skip if no data
+            if (Object.keys(paramData).length === 0) return;
+            
+            // Get or create chart container
+            let chartCard, canvas;
+            if (index < 3) {
+                // Reuse existing chart cards for first three parameters
+                chartCard = chartCards[index];
+                canvas = chartCard.querySelector('canvas');
+                canvas.id = `${paramType}Chart`;
+            } else {
+                // Create new chart card for additional parameters
+                chartCard = document.createElement('div');
+                chartCard.className = 'chart-card';
+                canvas = document.createElement('canvas');
+                canvas.id = `${paramType}Chart`;
+                chartCard.appendChild(canvas);
+                chartsContainer.appendChild(chartCard);
+            }
+            
+            // Create appropriate chart based on parameter type
+            const ctx = canvas.getContext('2d');
+            
+            if (paramType === 'age') {
+                charts[paramType] = new Chart(ctx, createBarChartConfig(
+                    'Age Distribution', 
+                    Object.keys(paramData), 
+                    Object.values(paramData),
+                    'rgba(54, 162, 235, 0.7)'
+                ));
+            } else if (paramType === 'gender') {
+                charts[paramType] = new Chart(ctx, createPieChartConfig(
+                    'Gender Distribution', 
+                    Object.keys(paramData), 
+                    Object.values(paramData)
+                ));
+            } else {
+                const topItems = getTopItems(paramData, 5);
+                charts[paramType] = new Chart(ctx, createBarChartConfig(
+                    paramInfo.name,
+                    topItems.labels,
+                    topItems.values,
+                    getColorForIndex(index)
+                ));
+            }
+        });
+    }
+    
+    function getColorForIndex(index) {
+        const colors = [
+            'rgba(255, 99, 132, 0.7)',
+            'rgba(54, 162, 235, 0.7)',
+            'rgba(255, 206, 86, 0.7)',
+            'rgba(75, 192, 192, 0.7)',
+            'rgba(153, 102, 255, 0.7)',
+            'rgba(255, 159, 64, 0.7)'
+        ];
+        return colors[index % colors.length];
     }
     
     function getTopItems(data, count) {
@@ -376,75 +592,81 @@ document.addEventListener('DOMContentLoaded', function() {
                 'Poor alignment - consider different targeting parameters or dataset'
         );
         
-        // Gender match insight
-        addInsight(
-            analysisResults.genderMatch >= 80 ? 'positive' : 
-            analysisResults.genderMatch >= 50 ? 'warning' : 'negative',
-            'Gender Match',
-            `${Math.round(analysisResults.genderMatch)}% match with your gender target`,
-            targetingInfo.gender === 'both' ? 
-                'You are targeting both genders' :
-                analysisResults.genderMatch >= 80 ?
-                'Strong gender match' :
-                analysisResults.genderMatch >= 50 ?
-                'Moderate gender match' :
-                'Weak gender match'
-        );
-        
-        // Age match insight
-        addInsight(
-            analysisResults.ageMatch >= 80 ? 'positive' : 
-            analysisResults.ageMatch >= 50 ? 'warning' : 'negative',
-            'Age Range Match',
-            `${Math.round(analysisResults.ageMatch)}% match with your age range (${targetingInfo.ageMin}-${targetingInfo.ageMax})`,
-            analysisResults.ageMatch >= 80 ?
-                'Strong age range match' :
-                analysisResults.ageMatch >= 50 ?
-                'Moderate age range match' :
-                'Weak age range match'
-        );
-        
-        // Parameter statistics insights
-        if (analysisResults.parameterStats.age) {
-            const ageStats = analysisResults.parameterStats.age;
+        // Gender match insight if gender parameter exists
+        if (sensitiveParams.gender) {
             addInsight(
-                'neutral',
-                'Age Statistics',
-                `Average age: ${ageStats.avg}, Range: ${ageStats.min}-${ageStats.max}`,
-                `The dataset contains ages from ${ageStats.min} to ${ageStats.max} with an average of ${ageStats.avg} years`
+                analysisResults.genderMatch >= 80 ? 'positive' : 
+                analysisResults.genderMatch >= 50 ? 'warning' : 'negative',
+                'Gender Match',
+                `${Math.round(analysisResults.genderMatch)}% match with your gender target`,
+                targetingInfo.gender === 'both' ? 
+                    'You are targeting both genders' :
+                    analysisResults.genderMatch >= 80 ?
+                    'Strong gender match' :
+                    analysisResults.genderMatch >= 50 ?
+                    'Moderate gender match' :
+                    'Weak gender match'
             );
         }
         
-        if (analysisResults.parameterStats.gender) {
-            const genderStats = analysisResults.parameterStats.gender;
-            const total = Object.values(genderStats).reduce((sum, count) => sum + count, 0);
-            const genderDistribution = Object.entries(genderStats)
-                .map(([gender, count]) => `${gender} (${Math.round((count/total)*100)}%)`)
-                .join(', ');
+        // Age match insight if age parameter exists
+        if (sensitiveParams.age) {
+            addInsight(
+                analysisResults.ageMatch >= 80 ? 'positive' : 
+                analysisResults.ageMatch >= 50 ? 'warning' : 'negative',
+                'Age Range Match',
+                `${Math.round(analysisResults.ageMatch)}% match with your age range (${targetingInfo.ageMin}-${targetingInfo.ageMax})`,
+                analysisResults.ageMatch >= 80 ?
+                    'Strong age range match' :
+                    analysisResults.ageMatch >= 50 ?
+                    'Moderate age range match' :
+                    'Weak age range match'
+            );
+        }
+        
+        // Add insights for each detected parameter
+        Object.entries(sensitiveParams).forEach(([paramType, paramInfo]) => {
+            const stats = analysisResults.parameterStats[paramType];
+            if (!stats) return;
             
-            addInsight(
-                'neutral',
-                'Gender Distribution',
-                genderDistribution,
-                'Breakdown of gender representation in the dataset'
-            );
-        }
-        
-        if (analysisResults.parameterStats.location) {
-            const locationStats = analysisResults.parameterStats.location;
-            const topLocations = Object.entries(locationStats)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 3)
-                .map(([loc]) => loc)
-                .join(', ');
-            
-            addInsight(
-                'neutral',
-                'Top Locations',
-                topLocations,
-                'Most frequently occurring locations in the dataset'
-            );
-        }
+            if (paramType === 'age' && stats.stats) {
+                const ageStats = stats.stats;
+                addInsight(
+                    'neutral',
+                    'Age Statistics',
+                    `Average age: ${ageStats.avg}, Range: ${ageStats.min}-${ageStats.max}`,
+                    `The dataset contains ages from ${ageStats.min} to ${ageStats.max} with an average of ${ageStats.avg} years`
+                );
+            } 
+            else if (paramType === 'gender') {
+                const total = Object.values(stats).reduce((sum, count) => sum + count, 0);
+                const distribution = Object.entries(stats)
+                    .map(([gender, count]) => `${gender} (${Math.round((count/total)*100)}%)`)
+                    .join(', ');
+                
+                addInsight(
+                    'neutral',
+                    'Gender Distribution',
+                    distribution,
+                    'Breakdown of gender representation in the dataset'
+                );
+            }
+            else {
+                // For other parameters, show top values
+                const topValues = Object.entries(stats)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 3)
+                    .map(([value, count]) => `${value} (${count})`)
+                    .join(', ');
+                
+                addInsight(
+                    'neutral',
+                    paramInfo.name,
+                    topValues,
+                    `Top values for ${paramInfo.name} in the dataset`
+                );
+            }
+        });
         
         // Recommendation insight
         let recommendation = '';
@@ -647,26 +869,28 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             // Convert charts to images and embed in PDF
-            const charts = [
-                { id: 'ageChart', yPos: 700, width: 300 },
-                { id: 'genderChart', yPos: 400, width: 300 },
-                { id: 'locationChart', yPos: 100, width: 300 }
-            ];
+            const chartElements = document.querySelectorAll('.chart-card canvas');
+            let chartYPos = 700;
             
-            for (const chart of charts) {
-                const canvas = document.getElementById(chart.id);
-                if (canvas) {
-                    const imageData = await html2canvas(canvas);
-                    const pngImage = await pdfDoc.embedPng(imageData.toDataURL());
-                    const pngDims = pngImage.scale(chart.width / imageData.width);
-                    
-                    page.drawImage(pngImage, {
-                        x: 400,
-                        y: chart.yPos,
-                        width: pngDims.width,
-                        height: pngDims.height,
-                    });
+            for (const chartElement of chartElements) {
+                if (chartYPos < 100) {
+                    // Add new page if we run out of space
+                    page = pdfDoc.addPage([800, 1200]);
+                    chartYPos = 1150;
                 }
+                
+                const imageData = await html2canvas(chartElement);
+                const pngImage = await pdfDoc.embedPng(imageData.toDataURL());
+                const pngDims = pngImage.scale(300 / imageData.width);
+                
+                page.drawImage(pngImage, {
+                    x: 400,
+                    y: chartYPos,
+                    width: pngDims.width,
+                    height: pngDims.height,
+                });
+                
+                chartYPos -= 350;
             }
             
             // Save the PDF
