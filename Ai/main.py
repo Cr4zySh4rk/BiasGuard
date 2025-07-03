@@ -5,7 +5,7 @@ from analyze import analyze_bias
 import json
 
 if __name__ == "__main__":
-    image_path = "test.jpg"
+    image_path = "image 2.jpg"
 
     # Step 1: Detect
     boxes = detect_objects(image_path)
@@ -18,3 +18,8 @@ if __name__ == "__main__":
     # Step 3: Analyze with Ollama
     summary = analyze_bias(captions)
     print("\n🧩 Ollama Bias Summary:\n", summary)
+    
+print("✅ Detected boxes:", boxes)
+print("✅ Generated captions:", captions)
+print("✅ Ollama output:", summary)
+
