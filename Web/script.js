@@ -9,19 +9,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const insightsContent = document.getElementById('insightsContent');
     const overallMatchScore = document.getElementById('overallMatchScore');
     const scoreDescription = document.getElementById('scoreDescription');
+    const targetingSection = document.getElementById('targetingSection');
     const ageMin = document.getElementById('ageMin');
     const ageMax = document.getElementById('ageMax');
     
     // Chart instances
-    let ageChart, genderChart, religionChart, locationChart;
+    let ageChart, genderChart, locationChart;
     
     // Data storage
     let csvData = [];
     let sensitiveParams = {
-        age: { name: 'Age', data: {}, chart: null },
-        gender: { name: 'Gender', data: {}, chart: null },
-        religion: { name: 'Religion', data: {}, chart: null },
-        location: { name: 'Location', data: {}, chart: null }
+        age: { name: 'Age', data: {} },
+        gender: { name: 'Gender', data: {} },
+        location: { name: 'Location', data: {} }
     };
     let targetingInfo = {
         gender: 'both',
@@ -33,7 +33,8 @@ document.addEventListener('DOMContentLoaded', function() {
         matchedRecords: 0,
         genderMatch: 0,
         ageMatch: 0,
-        matchScore: 0
+        matchScore: 0,
+        parameterStats: {}
     };
 
     // Event Listeners
@@ -45,16 +46,19 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('input[name="gender"]').forEach(radio => {
         radio.addEventListener('change', function() {
             targetingInfo.gender = this.value;
+            updateAnalysis();
         });
     });
     
     // Set up age range listeners
     ageMin.addEventListener('change', function() {
         targetingInfo.ageMin = parseInt(this.value) || 0;
+        updateAnalysis();
     });
     
     ageMax.addEventListener('change', function() {
         targetingInfo.ageMax = parseInt(this.value) || 100;
+        updateAnalysis();
     });
 
     function handleFileSelect(event) {
@@ -62,9 +66,18 @@ document.addEventListener('DOMContentLoaded', function() {
         if (file) {
             fileNameSpan.textContent = file.name;
             analyzeBtn.disabled = false;
+            targetingSection.classList.remove('hidden');
         } else {
             fileNameSpan.textContent = 'No file chosen';
             analyzeBtn.disabled = true;
+        }
+    }
+    
+    function updateAnalysis() {
+        if (csvData.length > 0) {
+            analyzeDataMatch();
+            updateMatchScoreDisplay();
+            generateInsights();
         }
     }
     
@@ -82,6 +95,65 @@ document.addEventListener('DOMContentLoaded', function() {
             // Update targeting info from inputs
             targetingInfo.ageMin = parseInt(ageMin.value) || 0;
             targetingInfo.ageMax = parseInt(ageMax.value) || 100;
+            
+            // Reset sensitive params data
+            Object.keys(sensitiveParams).forEach(key => {
+                sensitiveParams[key].data = {};
+            });
+            
+            // Collect parameter statistics
+            analysisResults.parameterStats = {};
+            csvData.forEach(record => {
+                // Age stats
+                const age = parseInt(record.age) || 0;
+                if (!isNaN(age)) {
+                    const ageGroup = Math.floor(age / 10) * 10;
+                    const ageRange = `${ageGroup}-${ageGroup + 9}`;
+                    sensitiveParams.age.data[ageRange] = (sensitiveParams.age.data[ageRange] || 0) + 1;
+                    
+                    if (!analysisResults.parameterStats.age) {
+                        analysisResults.parameterStats.age = {
+                            min: age,
+                            max: age,
+                            sum: age,
+                            count: 1
+                        };
+                    } else {
+                        analysisResults.parameterStats.age.min = Math.min(analysisResults.parameterStats.age.min, age);
+                        analysisResults.parameterStats.age.max = Math.max(analysisResults.parameterStats.age.max, age);
+                        analysisResults.parameterStats.age.sum += age;
+                        analysisResults.parameterStats.age.count++;
+                    }
+                }
+                
+                // Gender stats
+                if (record.gender) {
+                    const gender = record.gender.toLowerCase();
+                    sensitiveParams.gender.data[gender] = (sensitiveParams.gender.data[gender] || 0) + 1;
+                    
+                    if (!analysisResults.parameterStats.gender) {
+                        analysisResults.parameterStats.gender = {};
+                    }
+                    analysisResults.parameterStats.gender[gender] = (analysisResults.parameterStats.gender[gender] || 0) + 1;
+                }
+                
+                // Location stats
+                if (record.location) {
+                    const location = record.location.toLowerCase();
+                    sensitiveParams.location.data[location] = (sensitiveParams.location.data[location] || 0) + 1;
+                    
+                    if (!analysisResults.parameterStats.location) {
+                        analysisResults.parameterStats.location = {};
+                    }
+                    analysisResults.parameterStats.location[location] = (analysisResults.parameterStats.location[location] || 0) + 1;
+                }
+            });
+            
+            // Calculate average age
+            if (analysisResults.parameterStats.age) {
+                analysisResults.parameterStats.age.avg = 
+                    Math.round(analysisResults.parameterStats.age.sum / analysisResults.parameterStats.age.count);
+            }
             
             analyzeDataMatch();
             createCharts();
@@ -106,10 +178,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function parseCSV(text) {
-        const lines = text.split('\n');
-        const headers = lines[0].split(',').map(h => h.trim());
+        const lines = text.split('\n').filter(line => line.trim());
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
         
-        return lines.slice(1).filter(line => line.trim()).map(line => {
+        return lines.slice(1).map(line => {
             const values = line.split(',');
             return headers.reduce((obj, header, index) => {
                 obj[header] = values[index] ? values[index].trim() : '';
@@ -119,22 +191,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function analyzeDataMatch() {
-        analysisResults = {
-            totalRecords: csvData.length,
-            matchedRecords: 0,
-            genderMatch: 0,
-            ageMatch: 0,
-            matchScore: 0
-        };
-        
+        analysisResults.totalRecords = csvData.length;
         let genderMatchCount = 0;
         let ageMatchCount = 0;
         let bothMatchCount = 0;
-        
-        // Reset sensitive params data
-        Object.keys(sensitiveParams).forEach(key => {
-            sensitiveParams[key].data = {};
-        });
         
         csvData.forEach(record => {
             // Check gender match
@@ -149,33 +209,15 @@ document.addEventListener('DOMContentLoaded', function() {
             if (genderMatch) genderMatchCount++;
             if (ageMatch) ageMatchCount++;
             if (genderMatch && ageMatch) bothMatchCount++;
-            
-            // Collect data for visualizations
-            if (record.age) {
-                const ageGroup = Math.floor(age / 10) * 10;
-                const ageRange = `${ageGroup}-${ageGroup + 9}`;
-                sensitiveParams.age.data[ageRange] = (sensitiveParams.age.data[ageRange] || 0) + 1;
-            }
-            
-            if (record.gender) {
-                const gender = record.gender.toLowerCase();
-                sensitiveParams.gender.data[gender] = (sensitiveParams.gender.data[gender] || 0) + 1;
-            }
-            
-            if (record.religion) {
-                const religion = record.religion.toLowerCase();
-                sensitiveParams.religion.data[religion] = (sensitiveParams.religion.data[religion] || 0) + 1;
-            }
-            
-            if (record.location) {
-                const location = record.location.toLowerCase();
-                sensitiveParams.location.data[location] = (sensitiveParams.location.data[location] || 0) + 1;
-            }
         });
         
         // Calculate match percentages
-        analysisResults.genderMatch = (genderMatchCount / analysisResults.totalRecords) * 100;
-        analysisResults.ageMatch = (ageMatchCount / analysisResults.totalRecords) * 100;
+        analysisResults.genderMatch = analysisResults.totalRecords > 0 
+            ? (genderMatchCount / analysisResults.totalRecords) * 100 
+            : 0;
+        analysisResults.ageMatch = analysisResults.totalRecords > 0 
+            ? (ageMatchCount / analysisResults.totalRecords) * 100 
+            : 0;
         analysisResults.matchedRecords = bothMatchCount;
         
         // Calculate overall match score (weighted average)
@@ -183,9 +225,6 @@ document.addEventListener('DOMContentLoaded', function() {
             (analysisResults.genderMatch * 0.4) + 
             (analysisResults.ageMatch * 0.6)
         );
-        
-        // Update UI
-        updateMatchScoreDisplay();
     }
     
     function updateMatchScoreDisplay() {
@@ -207,7 +246,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function createCharts() {
         if (ageChart) ageChart.destroy();
         if (genderChart) genderChart.destroy();
-        if (religionChart) religionChart.destroy();
         if (locationChart) locationChart.destroy();
         
         // Age Chart
@@ -225,14 +263,6 @@ document.addEventListener('DOMContentLoaded', function() {
             'Gender Distribution', 
             Object.keys(sensitiveParams.gender.data), 
             Object.values(sensitiveParams.gender.data)
-        ));
-        
-        // Religion Chart
-        const religionCtx = document.getElementById('religionChart').getContext('2d');
-        religionChart = new Chart(religionCtx, createPieChartConfig(
-            'Religion Distribution', 
-            Object.keys(sensitiveParams.religion.data), 
-            Object.values(sensitiveParams.religion.data)
         ));
         
         // Location Chart
@@ -298,8 +328,7 @@ document.addEventListener('DOMContentLoaded', function() {
             'rgba(54, 162, 235, 0.7)',
             'rgba(255, 206, 86, 0.7)',
             'rgba(75, 192, 192, 0.7)',
-            'rgba(153, 102, 255, 0.7)',
-            'rgba(255, 159, 64, 0.7)'
+            'rgba(153, 102, 255, 0.7)'
         ];
         
         return {
@@ -374,6 +403,48 @@ document.addEventListener('DOMContentLoaded', function() {
                 'Moderate age range match' :
                 'Weak age range match'
         );
+        
+        // Parameter statistics insights
+        if (analysisResults.parameterStats.age) {
+            const ageStats = analysisResults.parameterStats.age;
+            addInsight(
+                'neutral',
+                'Age Statistics',
+                `Average age: ${ageStats.avg}, Range: ${ageStats.min}-${ageStats.max}`,
+                `The dataset contains ages from ${ageStats.min} to ${ageStats.max} with an average of ${ageStats.avg} years`
+            );
+        }
+        
+        if (analysisResults.parameterStats.gender) {
+            const genderStats = analysisResults.parameterStats.gender;
+            const total = Object.values(genderStats).reduce((sum, count) => sum + count, 0);
+            const genderDistribution = Object.entries(genderStats)
+                .map(([gender, count]) => `${gender} (${Math.round((count/total)*100)}%)`)
+                .join(', ');
+            
+            addInsight(
+                'neutral',
+                'Gender Distribution',
+                genderDistribution,
+                'Breakdown of gender representation in the dataset'
+            );
+        }
+        
+        if (analysisResults.parameterStats.location) {
+            const locationStats = analysisResults.parameterStats.location;
+            const topLocations = Object.entries(locationStats)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3)
+                .map(([loc]) => loc)
+                .join(', ');
+            
+            addInsight(
+                'neutral',
+                'Top Locations',
+                topLocations,
+                'Most frequently occurring locations in the dataset'
+            );
+        }
         
         // Recommendation insight
         let recommendation = '';
@@ -579,7 +650,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const charts = [
                 { id: 'ageChart', yPos: 700, width: 300 },
                 { id: 'genderChart', yPos: 400, width: 300 },
-                { id: 'religionChart', yPos: 100, width: 300 }
+                { id: 'locationChart', yPos: 100, width: 300 }
             ];
             
             for (const chart of charts) {
@@ -596,34 +667,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         height: pngDims.height,
                     });
                 }
-            }
-            
-            // Add location chart on a new page if needed
-            const locationCanvas = document.getElementById('locationChart');
-            if (locationCanvas) {
-                const locationImageData = await html2canvas(locationCanvas);
-                const locationPngImage = await pdfDoc.embedPng(locationImageData.toDataURL());
-                const locationPngDims = locationPngImage.scale(300 / locationImageData.width);
-                
-                if (yPos < 300) {
-                    page = pdfDoc.addPage([800, 1200]);
-                    yPos = 1150;
-                }
-                
-                page.drawImage(locationPngImage, {
-                    x: 50,
-                    y: yPos - 300,
-                    width: locationPngDims.width,
-                    height: locationPngDims.height,
-                });
-                
-                page.drawText('Top Locations:', {
-                    x: 50,
-                    y: yPos - 280,
-                    size: 14,
-                    font: fontBold,
-                    color: rgb(0, 0, 0)
-                });
             }
             
             // Save the PDF

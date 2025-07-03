@@ -26,7 +26,7 @@
                 </div>
             </section>
 
-            <section class="targeting-section">
+            <section class="targeting-section hidden" id="targetingSection">
                 <h3>Your Target Audience</h3>
                 
                 <div class="targeting-group">
@@ -52,9 +52,9 @@
                         <input type="number" id="ageMax" placeholder="Max age" min="0" max="100" value="65">
                     </div>
                 </div>
+                
+                <button id="analyzeBtn">Analyze Match</button>
             </section>
-
-            <button id="analyzeBtn" disabled>Analyze Match</button>
 
             <section class="data-section hidden">
                 <h2>Targeting Match Analysis</h2>
@@ -82,9 +82,6 @@
                         </div>
                         <div class="chart-card">
                             <canvas id="genderChart"></canvas>
-                        </div>
-                        <div class="chart-card">
-                            <canvas id="religionChart"></canvas>
                         </div>
                         <div class="chart-card">
                             <canvas id="locationChart"></canvas>
