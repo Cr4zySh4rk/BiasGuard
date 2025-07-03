@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ad Targeting Analytics Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.16.0/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Ad Targeting Analytics Dashboard</h1>
+            <p>Upload candidate data CSV to analyze sensitive parameters and generate reports</p>
+        </header>
+
+        <main>
+            <section class="upload-section">
+                <div class="file-upload">
+                    <input type="file" id="csvFile" accept=".csv">
+                    <label for="csvFile">Choose CSV File</label>
+                    <span id="fileName">No file chosen</span>
+                </div>
+                <button id="analyzeBtn" disabled>Analyze Data</button>
+            </section>
+
+            <!-- Add this right after the upload-section, before the analyze button -->
+<section class="targeting-section">
+    <h3>Targeting Parameters</h3>
+    
+    <div class="targeting-group">
+        <label for="genderTarget">Target Gender:</label>
+        <select id="genderTarget">
+            <option value="both">Both</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+        </select>
+    </div>
+    
+    <div class="targeting-group">
+        <label for="ageTargetType">Age Targeting:</label>
+        <select id="ageTargetType">
+            <option value="range">Specific Range</option>
+            <option value="group">Simplified Group</option>
+        </select>
+        
+        <div id="ageRangeInput">
+            <input type="number" id="ageMin" placeholder="Min age" min="0">
+            <span>to</span>
+            <input type="number" id="ageMax" placeholder="Max age" min="0">
+        </div>
+        
+        <div id="ageGroupInput" class="hidden">
+            <select id="ageGroup">
+                <option value="kids">Kids (0-17)</option>
+                <option value="adults">Adults (18-64)</option>
+                <option value="seniors">Seniors (65+)</option>
+                <option value="all">All Ages</option>
+            </select>
+        </div>
+    </div>
+</section>
+
+            <section class="data-section hidden">
+                <h2>Data Analysis Results</h2>
+                <div class="charts-container">
+                    <div class="chart-card">
+                        <canvas id="ageChart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <canvas id="genderChart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <canvas id="religionChart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <canvas id="locationChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="data-table">
+                    <h3>Parameter Distribution</h3>
+                    <table id="statsTable">
+                        <thead>
+                            <tr>
+                                <th>Parameter</th>
+                                <th>Categories</th>
+                                <th>Count</th>
+                                <th>Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody id="statsBody">
+                            <!-- Data will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="actions">
+                    <button id="generateReportBtn">Generate PDF Report</button>
+                </div>
+            </section>
+
+            <section class="loading-section hidden">
+                <div class="loader"></div>
+                <p>Analyzing data...</p>
+            </section>
+        </main>
+
+        <footer>
+            <p>Ad Targeting Analytics Tool &copy; 2023</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

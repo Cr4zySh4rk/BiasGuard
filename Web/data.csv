@@ -1,0 +1,105 @@
+age,gender,religion,location
+25,Male,Christian,New York
+32,Female,Muslim,Los Angeles
+45,Male,Hindu,Chicago
+28,Female,Buddhist,Houston
+22,Male,Christian,Phoenix
+35,Female,Muslim,Philadelphia
+41,Male,Hindu,San Antonio
+29,Female,Buddhist,San Diego
+27,Male,Christian,Dallas
+33,Female,Muslim,San Jose
+48,Male,Hindu,Austin
+26,Female,Buddhist,Jacksonville
+23,Male,Christian,Fort Worth
+37,Female,Muslim,Columbus
+42,Male,Hindu,Charlotte
+31,Female,Buddhist,San Francisco
+24,Male,Christian,Indianapolis
+36,Female,Muslim,Seattle
+44,Male,Hindu,Denver
+30,Female,Buddhist,Washington
+21,Male,Christian,Boston
+34,Female,Muslim,El Paso
+47,Male,Hindu,Nashville
+32,Female,Buddhist,Detroit
+25,Male,Christian,Oklahoma City
+38,Female,Muslim,Portland
+43,Male,Hindu,Las Vegas
+29,Female,Buddhist,Memphis
+26,Male,Christian,Louisville
+35,Female,Muslim,Baltimore
+46,Male,Hindu,Milwaukee
+28,Female,Buddhist,Albuquerque
+22,Male,Christian,Tucson
+33,Female,Muslim,Mesa
+41,Male,Hindu,Sacramento
+27,Female,Buddhist,Kansas City
+23,Male,Christian,Atlanta
+36,Female,Muslim,Omaha
+44,Male,Hindu,Colorado Springs
+30,Female,Buddhist,Raleigh
+24,Male,Christian,Miami
+37,Female,Muslim,Long Beach
+45,Male,Hindu,Virginia Beach
+31,Female,Buddhist,Oakland
+25,Male,Christian,Minnespolis
+34,Female,Muslim,Tulsa
+42,Male,Hindu,Arlington
+29,Female,Buddhist,New Orleans
+26,Male,Christian,Wichita
+35,Female,Muslim,Cleveland
+47,Male,Hindu,Tampa
+28,Female,Buddhist,Bakersfield
+22,Male,Christian,Aurora
+33,Female,Muslim,Anaheim
+43,Male,Hindu,Honolulu
+27,Female,Buddhist,Anchorage
+23,Male,Christian,Santa Ana
+36,Female,Muslim,Riverside
+44,Male,Hindu,Corpus Christi
+30,Female,Buddhist,Lexington
+24,Male,Christian,Stockton
+37,Female,Muslim,Henderson
+45,Male,Hindu,Saint Paul
+31,Female,Buddhist,Cincinnati
+25,Male,Christian,Greensboro
+34,Female,Muslim,Pittsburgh
+42,Male,Hindu,St. Louis
+29,Female,Buddhist,Lincoln
+26,Male,Christian,Orlando
+35,Female,Muslim,Plano
+47,Male,Hindu,Newark
+28,Female,Buddhist,Irvine
+22,Male,Christian,Toledo
+33,Female,Muslim,Durham
+43,Male,Hindu,Chula Vista
+27,Female,Buddhist,Fort Wayne
+23,Male,Christian,Jersey City
+36,Female,Muslim,St. Petersburg
+44,Male,Hindu,Laredo
+30,Female,Buddhist,Madison
+24,Male,Christian,Chandler
+37,Female,Muslim,Buffalo
+45,Male,Hindu,Lubbock
+31,Female,Buddhist,Scottsdale
+25,Male,Christian,Reno
+34,Female,Muslim,Glendale
+42,Male,Hindu,Gilbert
+29,Female,Buddhist,North Las Vegas
+26,Male,Christian,Winston-Salem
+35,Female,Muslim,Chesapeake
+47,Male,Hindu,Norfolk
+28,Female,Buddhist,Fremont
+22,Male,Christian,Irving
+33,Female,Muslim,Baton Rouge
+43,Male,Hindu,Richmond
+27,Female,Buddhist,Boise
+23,Male,Christian,San Bernardino
+36,Female,Muslim,Spokane
+44,Male,Hindu,Birmingham
+30,Female,Buddhist,Rochester
+24,Male,Christian,Des Moines
+37,Female,Muslim,Tacoma
+45,Male,Hindu,Fontana
+31,Female,Buddhist,Oxnard
