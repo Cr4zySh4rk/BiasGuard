@@ -6,17 +6,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const generateReportBtn = document.getElementById('generateReportBtn');
     const dataSection = document.querySelector('.data-section');
     const loadingSection = document.querySelector('.loading-section');
-    const statsTableBody = document.getElementById('statsBody');
-    
-    // Targeting elements
-    const genderTarget = document.getElementById('genderTarget');
-    const ageTargetType = document.getElementById('ageTargetType');
-    const ageRangeInput = document.getElementById('ageRangeInput');
-    const ageGroupInput = document.getElementById('ageGroupInput');
+    const insightsContent = document.getElementById('insightsContent');
+    const overallMatchScore = document.getElementById('overallMatchScore');
+    const scoreDescription = document.getElementById('scoreDescription');
     const ageMin = document.getElementById('ageMin');
     const ageMax = document.getElementById('ageMax');
-    const ageGroup = document.getElementById('ageGroup');
-
+    
     // Chart instances
     let ageChart, genderChart, religionChart, locationChart;
     
@@ -28,25 +23,39 @@ document.addEventListener('DOMContentLoaded', function() {
         religion: { name: 'Religion', data: {}, chart: null },
         location: { name: 'Location', data: {}, chart: null }
     };
+    let targetingInfo = {
+        gender: 'both',
+        ageMin: 18,
+        ageMax: 65
+    };
+    let analysisResults = {
+        totalRecords: 0,
+        matchedRecords: 0,
+        genderMatch: 0,
+        ageMatch: 0,
+        matchScore: 0
+    };
 
     // Event Listeners
     csvFileInput.addEventListener('change', handleFileSelect);
     analyzeBtn.addEventListener('click', analyzeData);
     generateReportBtn.addEventListener('click', generatePDFReport);
-    ageTargetType.addEventListener('change', toggleAgeInputType);
-
-    // Initialize age input visibility
-    toggleAgeInputType();
-
-    function toggleAgeInputType() {
-        if (ageTargetType.value === 'range') {
-            ageRangeInput.classList.remove('hidden');
-            ageGroupInput.classList.add('hidden');
-        } else {
-            ageRangeInput.classList.add('hidden');
-            ageGroupInput.classList.remove('hidden');
-        }
-    }
+    
+    // Set up radio button listeners
+    document.querySelectorAll('input[name="gender"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            targetingInfo.gender = this.value;
+        });
+    });
+    
+    // Set up age range listeners
+    ageMin.addEventListener('change', function() {
+        targetingInfo.ageMin = parseInt(this.value) || 0;
+    });
+    
+    ageMax.addEventListener('change', function() {
+        targetingInfo.ageMax = parseInt(this.value) || 100;
+    });
 
     function handleFileSelect(event) {
         const file = event.target.files[0];
@@ -70,12 +79,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const text = await readFileAsText(file);
             csvData = parseCSV(text);
             
-            // Get targeting parameters and analyze
-            const targeting = getTargetingParameters();
-            analyzeSensitiveParameters(targeting);
+            // Update targeting info from inputs
+            targetingInfo.ageMin = parseInt(ageMin.value) || 0;
+            targetingInfo.ageMax = parseInt(ageMax.value) || 100;
             
+            analyzeDataMatch();
             createCharts();
-            populateStatsTable();
+            generateInsights();
             
             loadingSection.classList.add('hidden');
             dataSection.classList.remove('hidden');
@@ -84,40 +94,6 @@ document.addEventListener('DOMContentLoaded', function() {
             loadingSection.classList.add('hidden');
             alert('Error analyzing data. Please check the file format and try again.');
         }
-    }
-    
-    function getTargetingParameters() {
-        const gender = genderTarget.value;
-        
-        let ageMinVal, ageMaxVal;
-        if (ageTargetType.value === 'range') {
-            ageMinVal = parseInt(ageMin.value) || 0;
-            ageMaxVal = parseInt(ageMax.value) || 100;
-        } else {
-            switch(ageGroup.value) {
-                case 'kids':
-                    ageMinVal = 0;
-                    ageMaxVal = 17;
-                    break;
-                case 'adults':
-                    ageMinVal = 18;
-                    ageMaxVal = 64;
-                    break;
-                case 'seniors':
-                    ageMinVal = 65;
-                    ageMaxVal = 100;
-                    break;
-                default:
-                    ageMinVal = 0;
-                    ageMaxVal = 100;
-            }
-        }
-        
-        return {
-            gender,
-            ageMin: ageMinVal,
-            ageMax: ageMaxVal
-        };
     }
     
     function readFileAsText(file) {
@@ -133,7 +109,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const lines = text.split('\n');
         const headers = lines[0].split(',').map(h => h.trim());
         
-        return lines.slice(1).map(line => {
+        return lines.slice(1).filter(line => line.trim()).map(line => {
             const values = line.split(',');
             return headers.reduce((obj, header, index) => {
                 obj[header] = values[index] ? values[index].trim() : '';
@@ -142,45 +118,90 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    function analyzeSensitiveParameters(targeting) {
+    function analyzeDataMatch() {
+        analysisResults = {
+            totalRecords: csvData.length,
+            matchedRecords: 0,
+            genderMatch: 0,
+            ageMatch: 0,
+            matchScore: 0
+        };
+        
+        let genderMatchCount = 0;
+        let ageMatchCount = 0;
+        let bothMatchCount = 0;
+        
+        // Reset sensitive params data
         Object.keys(sensitiveParams).forEach(key => {
             sensitiveParams[key].data = {};
         });
         
         csvData.forEach(record => {
-            // Check if record matches targeting criteria
+            // Check gender match
+            const gender = record.gender ? record.gender.toLowerCase() : '';
+            const genderMatch = targetingInfo.gender === 'both' || 
+                              gender === targetingInfo.gender;
+            
+            // Check age match
             const age = parseInt(record.age) || 0;
-            const genderMatch = targeting.gender === 'both' || 
-                              record.gender.toLowerCase() === targeting.gender;
-            const ageMatch = age >= targeting.ageMin && age <= targeting.ageMax;
+            const ageMatch = age >= targetingInfo.ageMin && age <= targetingInfo.ageMax;
             
-            if (!genderMatch || !ageMatch) return;
+            if (genderMatch) genderMatchCount++;
+            if (ageMatch) ageMatchCount++;
+            if (genderMatch && ageMatch) bothMatchCount++;
             
-            // Age analysis
+            // Collect data for visualizations
             if (record.age) {
                 const ageGroup = Math.floor(age / 10) * 10;
                 const ageRange = `${ageGroup}-${ageGroup + 9}`;
                 sensitiveParams.age.data[ageRange] = (sensitiveParams.age.data[ageRange] || 0) + 1;
             }
             
-            // Gender analysis
             if (record.gender) {
                 const gender = record.gender.toLowerCase();
                 sensitiveParams.gender.data[gender] = (sensitiveParams.gender.data[gender] || 0) + 1;
             }
             
-            // Religion analysis
             if (record.religion) {
                 const religion = record.religion.toLowerCase();
                 sensitiveParams.religion.data[religion] = (sensitiveParams.religion.data[religion] || 0) + 1;
             }
             
-            // Location analysis
             if (record.location) {
                 const location = record.location.toLowerCase();
                 sensitiveParams.location.data[location] = (sensitiveParams.location.data[location] || 0) + 1;
             }
         });
+        
+        // Calculate match percentages
+        analysisResults.genderMatch = (genderMatchCount / analysisResults.totalRecords) * 100;
+        analysisResults.ageMatch = (ageMatchCount / analysisResults.totalRecords) * 100;
+        analysisResults.matchedRecords = bothMatchCount;
+        
+        // Calculate overall match score (weighted average)
+        analysisResults.matchScore = Math.round(
+            (analysisResults.genderMatch * 0.4) + 
+            (analysisResults.ageMatch * 0.6)
+        );
+        
+        // Update UI
+        updateMatchScoreDisplay();
+    }
+    
+    function updateMatchScoreDisplay() {
+        overallMatchScore.textContent = `${analysisResults.matchScore}%`;
+        
+        // Set color based on score
+        if (analysisResults.matchScore >= 80) {
+            overallMatchScore.style.color = 'var(--secondary-color)';
+            scoreDescription.textContent = 'Excellent match! The dataset aligns very well with your target audience.';
+        } else if (analysisResults.matchScore >= 50) {
+            overallMatchScore.style.color = 'var(--warning-color)';
+            scoreDescription.textContent = 'Moderate match. Consider adjusting your targeting or finding a more suitable dataset.';
+        } else {
+            overallMatchScore.style.color = 'var(--danger-color)';
+            scoreDescription.textContent = 'Poor match. This dataset does not align well with your target audience.';
+        }
     }
     
     function createCharts() {
@@ -217,11 +238,19 @@ document.addEventListener('DOMContentLoaded', function() {
         // Location Chart
         const locationCtx = document.getElementById('locationChart').getContext('2d');
         locationChart = new Chart(locationCtx, createBarChartConfig(
-            'Location Distribution', 
-            Object.keys(sensitiveParams.location.data), 
-            Object.values(sensitiveParams.location.data),
+            'Top Locations', 
+            getTopItems(sensitiveParams.location.data, 5).labels,
+            getTopItems(sensitiveParams.location.data, 5).values,
             'rgba(75, 192, 192, 0.7)'
         ));
+    }
+    
+    function getTopItems(data, count) {
+        const items = Object.entries(data).sort((a, b) => b[1] - a[1]).slice(0, count);
+        return {
+            labels: items.map(item => item[0]),
+            values: items.map(item => item[1])
+        };
     }
     
     function createBarChartConfig(title, labels, data, backgroundColor) {
@@ -302,91 +331,130 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
     
-    function populateStatsTable() {
-        statsTableBody.innerHTML = '';
+    function generateInsights() {
+        insightsContent.innerHTML = '';
         
-        Object.keys(sensitiveParams).forEach(param => {
-            const paramData = sensitiveParams[param];
-            const total = Object.values(paramData.data).reduce((sum, count) => sum + count, 0);
-            
-            Object.keys(paramData.data).forEach((key, index) => {
-                const count = paramData.data[key];
-                const percentage = ((count / total) * 100).toFixed(1) + '%';
-                
-                const row = document.createElement('tr');
-                
-                if (index === 0) {
-                    const nameCell = document.createElement('td');
-                    nameCell.textContent = paramData.name;
-                    nameCell.rowSpan = Object.keys(paramData.data).length;
-                    row.appendChild(nameCell);
-                }
-                
-                const keyCell = document.createElement('td');
-                keyCell.textContent = key;
-                row.appendChild(keyCell);
-                
-                const countCell = document.createElement('td');
-                countCell.textContent = count;
-                row.appendChild(countCell);
-                
-                const percentageCell = document.createElement('td');
-                percentageCell.textContent = percentage;
-                row.appendChild(percentageCell);
-                
-                statsTableBody.appendChild(row);
-            });
-        });
+        // Main match insight
+        addInsight(
+            analysisResults.matchScore >= 80 ? 'positive' : 
+            analysisResults.matchScore >= 50 ? 'warning' : 'negative',
+            'Target Audience Match',
+            `${analysisResults.matchedRecords} of ${analysisResults.totalRecords} records (${Math.round((analysisResults.matchedRecords / analysisResults.totalRecords) * 100)}%) match both your gender and age criteria`,
+            analysisResults.matchScore >= 80 ? 
+                'Excellent alignment with your target audience' : 
+                analysisResults.matchScore >= 50 ?
+                'Moderate alignment - some adjustments may be needed' :
+                'Poor alignment - consider different targeting parameters or dataset'
+        );
+        
+        // Gender match insight
+        addInsight(
+            analysisResults.genderMatch >= 80 ? 'positive' : 
+            analysisResults.genderMatch >= 50 ? 'warning' : 'negative',
+            'Gender Match',
+            `${Math.round(analysisResults.genderMatch)}% match with your gender target`,
+            targetingInfo.gender === 'both' ? 
+                'You are targeting both genders' :
+                analysisResults.genderMatch >= 80 ?
+                'Strong gender match' :
+                analysisResults.genderMatch >= 50 ?
+                'Moderate gender match' :
+                'Weak gender match'
+        );
+        
+        // Age match insight
+        addInsight(
+            analysisResults.ageMatch >= 80 ? 'positive' : 
+            analysisResults.ageMatch >= 50 ? 'warning' : 'negative',
+            'Age Range Match',
+            `${Math.round(analysisResults.ageMatch)}% match with your age range (${targetingInfo.ageMin}-${targetingInfo.ageMax})`,
+            analysisResults.ageMatch >= 80 ?
+                'Strong age range match' :
+                analysisResults.ageMatch >= 50 ?
+                'Moderate age range match' :
+                'Weak age range match'
+        );
+        
+        // Recommendation insight
+        let recommendation = '';
+        if (analysisResults.matchScore >= 80) {
+            recommendation = 'This dataset is well-suited for your campaign. Proceed with confidence.';
+        } else if (analysisResults.matchScore >= 50) {
+            recommendation = 'Consider adjusting your targeting parameters or finding a more suitable dataset.';
+        } else {
+            recommendation = 'This dataset is not ideal for your campaign. Strongly consider finding alternative data.';
+        }
+        
+        addInsight(
+            'neutral',
+            'Recommendation',
+            recommendation,
+            'Based on your targeting criteria and dataset match'
+        );
+    }
+    
+    function addInsight(type, title, data, description) {
+        const insight = document.createElement('div');
+        insight.className = `insight-item insight-${type}`;
+        
+        insight.innerHTML = `
+            <h4>${title}</h4>
+            <div class="insight-data">${data}</div>
+            <div class="insight-description">${description}</div>
+        `;
+        
+        insightsContent.appendChild(insight);
     }
     
     async function generatePDFReport() {
         try {
             loadingSection.classList.remove('hidden');
             
+            // Create a new PDF document
             const { PDFDocument, rgb } = PDFLib;
             const pdfDoc = await PDFDocument.create();
-            const page = pdfDoc.addPage([600, 850]); // Increased height for additional content
             
+            // Add a new page (larger size for charts)
+            let page = pdfDoc.addPage([800, 1200]);
+            
+            // Set up fonts
             const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
             const fontBold = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
             
-            // Title
-            page.drawText('Ad Targeting Analytics Report', {
+            // Add title
+            page.drawText('Ad Targeting Match Report', {
                 x: 50,
-                y: 800,
-                size: 20,
+                y: 1150,
+                size: 24,
                 font: fontBold,
                 color: rgb(0, 0, 0)
             });
             
-            // Date
+            // Add date
             const today = new Date();
             page.drawText(`Generated on: ${today.toLocaleDateString()}`, {
                 x: 50,
-                y: 770,
+                y: 1110,
                 size: 12,
                 font: font,
                 color: rgb(0, 0, 0)
             });
             
-            // Get targeting parameters
-            const targeting = getTargetingParameters();
-            
-            // Targeting Section
-            page.drawText('Targeting Parameters:', {
+            // Add targeting information
+            page.drawText('Your Target Audience:', {
                 x: 50,
-                y: 730,
+                y: 1060,
                 size: 16,
                 font: fontBold,
                 color: rgb(0, 0, 0)
             });
             
-            const genderText = `Gender: ${targeting.gender === 'both' ? 'Male & Female' : targeting.gender}`;
-            const ageText = `Age Range: ${targeting.ageMin}-${targeting.ageMax}`;
+            const genderText = `Gender: ${targetingInfo.gender === 'both' ? 'Male & Female' : targetingInfo.gender}`;
+            const ageText = `Age Range: ${targetingInfo.ageMin}-${targetingInfo.ageMax}`;
             
             page.drawText(genderText, {
                 x: 50,
-                y: 700,
+                y: 1030,
                 size: 12,
                 font: font,
                 color: rgb(0, 0, 0)
@@ -394,81 +462,174 @@ document.addEventListener('DOMContentLoaded', function() {
             
             page.drawText(ageText, {
                 x: 50,
-                y: 680,
+                y: 1010,
                 size: 12,
                 font: font,
                 color: rgb(0, 0, 0)
             });
             
-            // Compliance Analysis
-            const totalRecords = csvData.length;
-            const filteredRecords = Object.values(sensitiveParams.age.data).reduce((a,b) => a + b, 0);
-            const compliancePercent = ((filteredRecords / totalRecords) * 100).toFixed(1);
+            // Add match score
+            const scoreColor = analysisResults.matchScore >= 80 ? rgb(0, 0.5, 0) :
+                             analysisResults.matchScore >= 50 ? rgb(0.8, 0.5, 0) :
+                             rgb(0.8, 0, 0);
             
-            page.drawText('Targeting Compliance:', {
+            page.drawText('Overall Match Score:', {
                 x: 50,
-                y: 650,
+                y: 970,
                 size: 16,
                 font: fontBold,
                 color: rgb(0, 0, 0)
             });
             
-            page.drawText(`${filteredRecords} of ${totalRecords} records (${compliancePercent}%) match your targeting criteria`, {
+            page.drawText(`${analysisResults.matchScore}%`, {
                 x: 50,
-                y: 620,
+                y: 940,
+                size: 36,
+                font: fontBold,
+                color: scoreColor
+            });
+            
+            // Add match description
+            let matchDesc = '';
+            if (analysisResults.matchScore >= 80) {
+                matchDesc = 'Excellent match! The dataset aligns very well with your target audience.';
+            } else if (analysisResults.matchScore >= 50) {
+                matchDesc = 'Moderate match. Consider adjusting your targeting or finding a more suitable dataset.';
+            } else {
+                matchDesc = 'Poor match. This dataset does not align well with your target audience.';
+            }
+            
+            page.drawText(matchDesc, {
+                x: 50,
+                y: 900,
                 size: 12,
                 font: font,
                 color: rgb(0, 0, 0)
             });
             
-            // Summary Statistics
-            let yPos = 580;
-            page.drawText('Summary Statistics:', {
+            // Add insights section
+            page.drawText('Detailed Insights:', {
                 x: 50,
-                y: yPos,
+                y: 860,
                 size: 16,
                 font: fontBold,
                 color: rgb(0, 0, 0)
             });
             
-            yPos -= 30;
+            const insights = document.querySelectorAll('.insight-item');
+            let yPos = 830;
             
-            Object.keys(sensitiveParams).forEach(param => {
-                const paramData = sensitiveParams[param];
-                const total = Object.values(paramData.data).reduce((sum, count) => sum + count, 0);
+            insights.forEach((insight, index) => {
+                if (yPos < 100) {
+                    // Add new page if we run out of space
+                    page = pdfDoc.addPage([800, 1200]);
+                    yPos = 1150;
+                    page.drawText('Detailed Insights (continued):', {
+                        x: 50,
+                        y: 1150,
+                        size: 16,
+                        font: fontBold,
+                        color: rgb(0, 0, 0)
+                    });
+                    yPos = 1120;
+                }
                 
-                page.drawText(`${paramData.name} Distribution:`, {
+                const title = insight.querySelector('h4').textContent;
+                const data = insight.querySelector('.insight-data').textContent;
+                const desc = insight.querySelector('.insight-description').textContent;
+                
+                // Determine color based on insight type
+                let color = rgb(0, 0, 0);
+                if (insight.classList.contains('insight-positive')) {
+                    color = rgb(0, 0.5, 0);
+                } else if (insight.classList.contains('insight-negative')) {
+                    color = rgb(0.8, 0, 0);
+                } else if (insight.classList.contains('insight-warning')) {
+                    color = rgb(0.8, 0.5, 0);
+                }
+                
+                page.drawText(title, {
                     x: 50,
                     y: yPos,
                     size: 14,
                     font: fontBold,
+                    color: color
+                });
+                
+                page.drawText(data, {
+                    x: 50,
+                    y: yPos - 20,
+                    size: 12,
+                    font: font,
+                    color: color
+                });
+                
+                page.drawText(desc, {
+                    x: 50,
+                    y: yPos - 40,
+                    size: 10,
+                    font: font,
+                    color: rgb(0.3, 0.3, 0.3)
+                });
+                
+                yPos -= 70;
+            });
+            
+            // Convert charts to images and embed in PDF
+            const charts = [
+                { id: 'ageChart', yPos: 700, width: 300 },
+                { id: 'genderChart', yPos: 400, width: 300 },
+                { id: 'religionChart', yPos: 100, width: 300 }
+            ];
+            
+            for (const chart of charts) {
+                const canvas = document.getElementById(chart.id);
+                if (canvas) {
+                    const imageData = await html2canvas(canvas);
+                    const pngImage = await pdfDoc.embedPng(imageData.toDataURL());
+                    const pngDims = pngImage.scale(chart.width / imageData.width);
+                    
+                    page.drawImage(pngImage, {
+                        x: 400,
+                        y: chart.yPos,
+                        width: pngDims.width,
+                        height: pngDims.height,
+                    });
+                }
+            }
+            
+            // Add location chart on a new page if needed
+            const locationCanvas = document.getElementById('locationChart');
+            if (locationCanvas) {
+                const locationImageData = await html2canvas(locationCanvas);
+                const locationPngImage = await pdfDoc.embedPng(locationImageData.toDataURL());
+                const locationPngDims = locationPngImage.scale(300 / locationImageData.width);
+                
+                if (yPos < 300) {
+                    page = pdfDoc.addPage([800, 1200]);
+                    yPos = 1150;
+                }
+                
+                page.drawImage(locationPngImage, {
+                    x: 50,
+                    y: yPos - 300,
+                    width: locationPngDims.width,
+                    height: locationPngDims.height,
+                });
+                
+                page.drawText('Top Locations:', {
+                    x: 50,
+                    y: yPos - 280,
+                    size: 14,
+                    font: fontBold,
                     color: rgb(0, 0, 0)
                 });
-                
-                yPos -= 20;
-                
-                Object.keys(paramData.data).forEach(key => {
-                    const count = paramData.data[key];
-                    const percentage = ((count / total) * 100).toFixed(1);
-                    
-                    page.drawText(`- ${key}: ${count} (${percentage}%)`, {
-                        x: 70,
-                        y: yPos,
-                        size: 12,
-                        font: font,
-                        color: rgb(0, 0, 0)
-                    });
-                    
-                    yPos -= 20;
-                });
-                
-                yPos -= 10;
-            });
+            }
             
             // Save the PDF
             const pdfBytes = await pdfDoc.save();
             const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-            saveAs(blob, 'Ad_Targeting_Analytics_Report.pdf');
+            saveAs(blob, 'Targeting_Match_Report.pdf');
             
             loadingSection.classList.add('hidden');
         } catch (error) {

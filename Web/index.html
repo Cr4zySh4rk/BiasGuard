@@ -8,12 +8,13 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.16.0/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>Ad Targeting Analytics Dashboard</h1>
-            <p>Upload candidate data CSV to analyze sensitive parameters and generate reports</p>
+            <p>Upload candidate data CSV to analyze how well they match your target audience</p>
         </header>
 
         <main>
@@ -23,88 +24,82 @@
                     <label for="csvFile">Choose CSV File</label>
                     <span id="fileName">No file chosen</span>
                 </div>
-                <button id="analyzeBtn" disabled>Analyze Data</button>
             </section>
 
-            <!-- Add this right after the upload-section, before the analyze button -->
-<section class="targeting-section">
-    <h3>Targeting Parameters</h3>
-    
-    <div class="targeting-group">
-        <label for="genderTarget">Target Gender:</label>
-        <select id="genderTarget">
-            <option value="both">Both</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-        </select>
-    </div>
-    
-    <div class="targeting-group">
-        <label for="ageTargetType">Age Targeting:</label>
-        <select id="ageTargetType">
-            <option value="range">Specific Range</option>
-            <option value="group">Simplified Group</option>
-        </select>
-        
-        <div id="ageRangeInput">
-            <input type="number" id="ageMin" placeholder="Min age" min="0">
-            <span>to</span>
-            <input type="number" id="ageMax" placeholder="Max age" min="0">
-        </div>
-        
-        <div id="ageGroupInput" class="hidden">
-            <select id="ageGroup">
-                <option value="kids">Kids (0-17)</option>
-                <option value="adults">Adults (18-64)</option>
-                <option value="seniors">Seniors (65+)</option>
-                <option value="all">All Ages</option>
-            </select>
-        </div>
-    </div>
-</section>
+            <section class="targeting-section">
+                <h3>Your Target Audience</h3>
+                
+                <div class="targeting-group">
+                    <label>Target Gender:</label>
+                    <div class="radio-group">
+                        <label>
+                            <input type="radio" name="gender" value="both" checked> Both
+                        </label>
+                        <label>
+                            <input type="radio" name="gender" value="male"> Male
+                        </label>
+                        <label>
+                            <input type="radio" name="gender" value="female"> Female
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="targeting-group">
+                    <label>Target Age Range:</label>
+                    <div class="range-input">
+                        <input type="number" id="ageMin" placeholder="Min age" min="0" max="100" value="18">
+                        <span>to</span>
+                        <input type="number" id="ageMax" placeholder="Max age" min="0" max="100" value="65">
+                    </div>
+                </div>
+            </section>
+
+            <button id="analyzeBtn" disabled>Analyze Match</button>
 
             <section class="data-section hidden">
-                <h2>Data Analysis Results</h2>
-                <div class="charts-container">
-                    <div class="chart-card">
-                        <canvas id="ageChart"></canvas>
+                <h2>Targeting Match Analysis</h2>
+                
+                <div class="match-score-container">
+                    <div class="match-score">
+                        <div class="score-value" id="overallMatchScore">0%</div>
+                        <div class="score-label">Overall Match Score</div>
                     </div>
-                    <div class="chart-card">
-                        <canvas id="genderChart"></canvas>
-                    </div>
-                    <div class="chart-card">
-                        <canvas id="religionChart"></canvas>
-                    </div>
-                    <div class="chart-card">
-                        <canvas id="locationChart"></canvas>
+                    <div class="score-description" id="scoreDescription">
+                        Upload data to see how well it matches your target audience
                     </div>
                 </div>
 
-                <div class="data-table">
-                    <h3>Parameter Distribution</h3>
-                    <table id="statsTable">
-                        <thead>
-                            <tr>
-                                <th>Parameter</th>
-                                <th>Categories</th>
-                                <th>Count</th>
-                                <th>Percentage</th>
-                            </tr>
-                        </thead>
-                        <tbody id="statsBody">
-                            <!-- Data will be inserted here -->
-                        </tbody>
-                    </table>
+                <div class="insights-section">
+                    <h3>Detailed Insights</h3>
+                    <div id="insightsContent"></div>
+                </div>
+
+                <div class="visualizations-section">
+                    <h3>Data Visualizations</h3>
+                    <div class="charts-container">
+                        <div class="chart-card">
+                            <canvas id="ageChart"></canvas>
+                        </div>
+                        <div class="chart-card">
+                            <canvas id="genderChart"></canvas>
+                        </div>
+                        <div class="chart-card">
+                            <canvas id="religionChart"></canvas>
+                        </div>
+                        <div class="chart-card">
+                            <canvas id="locationChart"></canvas>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="actions">
-                    <button id="generateReportBtn">Generate PDF Report</button>
+                    <button id="generateReportBtn">Generate Detailed Report</button>
                 </div>
             </section>
 
             <section class="loading-section hidden">
                 <div class="loader"></div>
-                <p>Analyzing data...</p>
+                <p>Analyzing data match...</p>
             </section>
         </main>
 
