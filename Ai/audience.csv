@@ -1,0 +1,11 @@
+ID,Gender,AgeGroup,Income,Region,Religion,Race,Education,Occupation,MaritalStatus
+1,Male,Adult,45000,Urban,Christian,White,College,Engineer,Married
+2,Female,Adult,40000,Urban,Muslim,Black,HighSchool,Teacher,Single
+3,Male,Adult,50000,Suburban,Hindu,Asian,Graduate,Doctor,Married
+4,Female,Senior,30000,Rural,Christian,White,College,Nurse,Widowed
+5,Male,Adult,60000,Urban,Muslim,Black,Graduate,Lawyer,Divorced
+6,Female,Youth,25000,Suburban,Hindu,Asian,HighSchool,Student,Single
+7,Male,Youth,20000,Rural,Christian,White,HighSchool,Student,Single
+8,Female,Adult,55000,Urban,Christian,White,Graduate,Designer,Married
+9,Male,Senior,35000,Suburban,Muslim,Black,College,Retired,Widowed
+10,Female,Adult,48000,Rural,Hindu,Asian,Graduate,Engineer,Married
