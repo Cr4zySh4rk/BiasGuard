@@ -1,8 +1,6 @@
-torch
-transformers
-ultralytics
-Pillow
-requests
 streamlit
-ultralytics
+pandas
+easyocr
 opencv-python
+numpy
+Pillow
