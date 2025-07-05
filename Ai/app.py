@@ -66,26 +66,36 @@ def analyze_image_for_visual_context(image_bytes, extracted_text=""):
     """
     Generates a descriptive caption for the image and analyzes it for potential biases.
     Also attempts to flag sensitive visual contexts based on caption content and OCR text.
+    Returns categorized bias flags and a score.
     """
-    visual_flags = []
+    visual_bias_categories = {
+        "gender": [],
+        "age": [],
+        "stereotypical_role": [],
+        "benevolent_sexism": [],
+        "racial_socioeconomic": [],
+        "ableism": []
+    }
     visual_bias_score = 0
     generated_caption = ""
+    all_visual_flags = [] # To collect all raw flags for overall check
 
     try:
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         
-        # Generate caption using the BLIP model.
-        # We can't use max_new_tokens or num_beams directly in the pipeline call.
-        # For more detailed captions, one would typically use a more advanced VLM
-        # or fine-tune this model, which is beyond hackathon scope.
         caption_results = image_captioner(image) 
         if caption_results and caption_results[0] and 'generated_text' in caption_results[0]:
             generated_caption = caption_results[0]['generated_text']
             st.write(f"**Generated Image Caption:** `{generated_caption}`")
             
             # Analyze the generated caption for bias using the text bias detector
+            # This will populate the bias_categories based on the caption text
             caption_bias_analysis = analyze_text_for_bias(generated_caption)
-            visual_flags.extend(caption_bias_analysis['bias_flags'])
+            
+            # Merge bias categories and score from caption analysis
+            for category, flags in caption_bias_analysis['bias_categories'].items():
+                visual_bias_categories[category].extend(flags)
+                all_visual_flags.extend(flags) # Add to general list for overall check
             visual_bias_score += caption_bias_analysis['bias_score']
 
             # --- Advanced (Rule-based) Visual Bias Detection based on Caption and OCR text ---
@@ -93,45 +103,46 @@ def analyze_image_for_visual_context(image_bytes, extracted_text=""):
             text_lower = extracted_text.lower() # Use OCR text for contextual flagging
 
             # Heuristic for detecting contrasting individuals in a "struggle/freedom" narrative (from previous example)
-            # This rule is now more specific to the content of the caption.
             if ('man' in caption_lower and 'suit' in caption_lower) and \
-               ('man' in caption_lower or 'person' in caption_lower) and \
+               ('man' in caption_lower or 'person' in caption_lower or 'people' in caption_lower) and \
                ('struggling' in text_lower or 'money' in text_lower or 'financial freedom' in text_lower):
-                visual_flags.append("Sensitive Visual Context: Potential racial/socio-economic stereotype implied by contrasting individuals in a financial narrative. **Requires Human Review.**")
+                flag = "Potential racial/socio-economic stereotype implied by contrasting individuals in a financial narrative. **Requires Human Review.**"
+                visual_bias_categories["racial_socioeconomic"].append(flag)
+                all_visual_flags.append(flag)
                 visual_bias_score += 5 
                 
             # Heuristic: Detecting "Benevolent Sexism/Vulnerability" in visuals (from previous example)
-            # This rule is now more specific to the content of the caption.
             if ('woman' in caption_lower or 'female' in caption_lower) and \
                ('car' in caption_lower or 'vehicle' in caption_lower) and \
                ('safety' in text_lower or 'safe' in text_lower or 'protection' in text_lower or 'confidence starts with feeling safe' in text_lower) and \
                ('especially for women' in text_lower or 'for women' in text_lower): 
-                visual_flags.append("Sensitive Visual Context: Potential benevolent sexism/vulnerability stereotype (e.g., implying women need special safety). **Requires Human Review.**")
+                flag = "Potential benevolent sexism/vulnerability stereotype (e.g., implying women need special safety). **Requires Human Review.**"
+                visual_bias_categories["benevolent_sexism"].append(flag)
+                all_visual_flags.append(flag)
                 visual_bias_score += 4 
 
             # NEW HEURISTIC: Detecting potential ableism/exclusion in active contexts (more specific to caption)
-            # This is a general heuristic since direct "wheelchair" detection is hard for the model.
-            # It flags if a person is mentioned in the caption, and the OCR text is about an active sport,
-            # implying a potential for exclusion if the visual context is not inclusive.
             active_sport_keywords = ['skateboard', 'skateboarding', 'sport', 'active', 'run', 'jump', 'play']
-            # Check if caption implies a seated person or mentions a wheelchair (if the model does)
             if ('person' in caption_lower or 'man' in caption_lower or 'people' in caption_lower) and \
                any(keyword in text_lower for keyword in active_sport_keywords) and \
-               ('sitting' in caption_lower or 'seated' in caption_lower or 'wheelchair' in caption_lower or 'bench' in caption_lower): # Added 'bench' as a common misinterpretation for wheelchair
-                visual_flags.append("Sensitive Visual Context: Potential ableism/exclusion in active sport context (e.g., person in wheelchair with active sport ad). **Requires Human Review.**")
-                visual_bias_score += 4 # High penalty
+               ('sitting' in caption_lower or 'seated' in caption_lower or 'wheelchair' in caption_lower or 'bench' in caption_lower): 
+                flag = "Potential ableism/exclusion in active sport context (e.g., person in wheelchair with active sport ad). **Requires Human Review.**"
+                visual_bias_categories["ableism"].append(flag)
+                all_visual_flags.append(flag)
+                visual_bias_score += 4 
 
         else:
             st.warning("Could not generate a descriptive caption for the image.")
 
     except Exception as e:
         st.error(f"Error analyzing image visual context: {e}")
-        visual_flags.append("Error during visual analysis.")
+        all_visual_flags.append("Error during visual analysis.")
 
     return {
         "generated_caption": generated_caption,
-        "visual_flags": visual_flags,
-        "is_visually_biased": len(visual_flags) > 0,
+        "visual_flags": all_visual_flags, # Keep for backward compatibility if needed, but categories are primary
+        "bias_categories": visual_bias_categories,
+        "is_visually_biased": len(all_visual_flags) > 0,
         "visual_bias_score": visual_bias_score
     }
 
@@ -142,11 +153,19 @@ def analyze_text_for_bias(text):
     """
     Analyzes text for potential gender, racial, age, or other biases.
     Uses simple keyword matching and stereotypical context detection.
-    Returns flags and a bias score.
+    Returns categorized bias flags and a score.
     """
-    bias_flags = []
+    bias_categories = {
+        "gender": [],
+        "age": [],
+        "stereotypical_role": [],
+        "benevolent_sexism": [],
+        "racial_socioeconomic": [],
+        "ableism": []
+    }
     suggestions = []
     bias_score = 0 # Initialize bias score
+    all_flags = [] # To collect all raw flags for overall check
 
     text_lower = text.lower()
 
@@ -157,13 +176,17 @@ def analyze_text_for_bias(text):
     if any(keyword in text_lower for keyword in gender_keywords_male) and \
        not any(keyword in text_lower for keyword in gender_keywords_female) and \
        not any(k in text_lower for k in ['person', 'individual', 'they', 'their', 'everyone']):
-        bias_flags.append("Potential gender bias (male-centric language).")
+        flag = "Male-centric language detected."
+        bias_categories["gender"].append(flag)
+        all_flags.append(flag)
         suggestions.append("Consider using gender-neutral terms like 'business professional', 'they/their', 'individuals'.")
         bias_score += 1
     elif any(keyword in text_lower for keyword in gender_keywords_female) and \
          not any(keyword in text_lower for keyword in gender_keywords_male) and \
          not any(k in text_lower for k in ['person', 'individual', 'they', 'their', 'everyone']):
-        bias_flags.append("Potential gender bias (female-centric language).")
+        flag = "Female-centric language detected."
+        bias_categories["gender"].append(flag)
+        all_flags.append(flag)
         suggestions.append("Consider using gender-neutral terms like 'business professional', 'they/their', 'individuals'.")
         bias_score += 1
 
@@ -173,12 +196,16 @@ def analyze_text_for_bias(text):
 
     if any(keyword in text_lower for keyword in age_keywords_old) and \
        not any(keyword in text_lower for keyword in ['all ages', 'everyone', 'diverse', 'inclusive']):
-        bias_flags.append("Potential age bias (targeting only older demographic, potentially excluding others).")
+        flag = "Targeting only older demographic, potentially excluding others."
+        bias_categories["age"].append(flag)
+        all_flags.append(flag)
         suggestions.append("Ensure target audience is clearly defined. Use inclusive language if the product is for all ages.")
         bias_score += 1
     if any(keyword in text_lower for keyword in age_keywords_young) and \
        not any(keyword in text_lower for k in ['all ages', 'everyone', 'diverse', 'inclusive']):
-        bias_flags.append("Potential age bias (targeting only younger demographic, potentially excluding others).")
+        flag = "Targeting only younger demographic, potentially excluding others."
+        bias_categories["age"].append(flag)
+        all_flags.append(flag)
         suggestions.append("Ensure target audience is clearly defined. Use inclusive language if the product is for all ages.")
         bias_score += 1
 
@@ -194,34 +221,51 @@ def analyze_text_for_bias(text):
     # Check for female stereotypical bias
     if any(phrase in text_lower for phrase in gender_best_phrases) and \
        any(prod_role in text_lower for prod_role in female_stereotypical_products_roles):
-        bias_flags.append("Potential stereotypical gender role bias (e.g., linking women to domestic/beauty roles).")
+        flag = "Linking women to domestic/beauty roles."
+        bias_categories["stereotypical_role"].append(flag)
+        all_flags.append(flag)
         suggestions.append("Avoid reinforcing traditional gender stereotypes. Focus on product benefits for all users, regardless of gender. Use gender-neutral phrasing and imagery.")
         bias_score += 2
 
     # Check for male stereotypical bias
     if any(phrase in text_lower for phrase in gender_best_phrases) and \
        any(prod_role in text_lower for prod_role in male_stereotypical_products_roles):
-        bias_flags.append("Potential stereotypical gender role bias (e.g., linking men to power/tech/sports roles).")
+        flag = "Linking men to power/tech/sports roles."
+        bias_categories["stereotypical_role"].append(flag)
+        all_flags.append(flag)
         suggestions.append("Avoid reinforcing traditional gender stereotypes. Focus on product benefits for all users, regardless of gender. Use gender-neutral phrasing and imagery.")
         bias_score += 2
     
     # Benevolent Sexism / Vulnerability Bias (Textual) - Score: +4 for strong match
     if ('especially for women' in text_lower or 'for women' in text_lower) and \
        ('safety' in text_lower or 'safe' in text_lower or 'protection' in text_lower or 'confidence starts with feeling safe' in text_lower):
-        bias_flags.append("Potential benevolent sexism: Implies women need special safety/protection or derive confidence from it. **Requires Human Review.**")
+        flag = "Implies women need special safety/protection or derive confidence from it. **Requires Human Review.**"
+        bias_categories["benevolent_sexism"].append(flag)
+        all_flags.append(flag)
         suggestions.append("Ensure safety messages are universal or focus on features, not gender-specific vulnerability. Confidence should stem from internal agency.")
         bias_score += 4 
 
-    # Racial/Religious/Other Sensitive Bias (Conceptual for text-only keywords)
+    # Racial/Socio-economic/Ableism Sensitive Bias (Conceptual for text-only keywords)
     problematic_terms = ['primitive', 'backward', 'exotic', 'foreigner', 'ghetto', 'terrorist', 'struggling', 'poverty', 'wealth', 'freedom', 'disabled', 'handicap', 'wheelchair'] 
     if any(term in text_lower for term in problematic_terms):
-        bias_flags.append("Potential use of problematic or stereotypical language related to race/origin/religion/socio-economic status/disability. Requires urgent human review.")
+        flag = "Use of problematic or stereotypical language related to race/origin/religion/socio-economic status/disability. Requires urgent human review."
+        # This flag can cover multiple categories, for simplicity in hackathon, we combine.
+        if 'struggling' in text_lower or 'poverty' in text_lower or 'wealth' in text_lower or 'freedom' in text_lower:
+            bias_categories["racial_socioeconomic"].append(flag)
+        if 'disabled' in text_lower or 'handicap' in text_lower or 'wheelchair' in text_lower:
+            bias_categories["ableism"].append(flag)
+        
+        # If it's not specifically socio-economic or ableism, but still problematic
+        if not bias_categories["racial_socioeconomic"] and not bias_categories["ableism"]:
+            bias_categories["racial_socioeconomic"].append(flag) # Default to this for other problematic terms
+
+        all_flags.append(flag)
         suggestions.append("Review language for any unintended racial, cultural, religious, socio-economic, or disability-related stereotypes/insensitivities.")
         bias_score += 3 # Higher score for sensitive categories
 
     return {
-        "is_biased": len(bias_flags) > 0,
-        "bias_flags": bias_flags,
+        "is_biased": len(all_flags) > 0,
+        "bias_categories": bias_categories,
         "suggestions": suggestions,
         "bias_score": bias_score
     }
@@ -399,27 +443,46 @@ if page_selection == "Ad Copy Bias & Security":
                 # Perform Bias Analysis
                 st.markdown("##### Bias Analysis:")
                 bias_results = analyze_text_for_bias(copy)
+                
                 if bias_results['is_biased']:
-                    st.error(f"Potential Bias Detected: {', '.join(bias_results['bias_flags'])}")
+                    st.error("Potential Bias Detected!")
+                    # Display flags by category
+                    for category, flags in bias_results['bias_categories'].items():
+                        if flags:
+                            st.markdown(f"**- {category.replace('_', ' ').title()} Bias:**")
+                            for flag in flags:
+                                st.warning(f"  - {flag}")
                     st.write("Suggestions:", " ".join(bias_results['suggestions']))
                     st.metric("Textual Bias Score (0-10)", bias_results['bias_score'])
                 else:
-                    st.success("No significant bias detected in this ad copy.")
+                    st.success("No significant textual bias detected.")
                     st.metric("Textual Bias Score (0-10)", bias_results['bias_score'])
                 
                 # Perform Security Checks
                 st.markdown("##### Security Checks:")
                 pii_results = check_for_pii(copy)
+                harmful_results = check_for_harmful_content(copy)
+
+                compliance_risk = False
                 if pii_results['has_pii']:
                     st.error(f"PII Detected! Found: {', '.join(pii_results['detected_items'])}. This information should be redacted.")
+                    st.write("Suggestions: Remove or redact sensitive personal information before public display.")
+                    compliance_risk = True
                 else:
                     st.success("No Personal Identifiable Information (PII) found.")
 
-                harmful_results = check_for_harmful_content(copy)
                 if harmful_results['has_harmful_content']:
                     st.error(f"Harmful Content Detected! Found: {', '.join(harmful_results['detected_items'])}. Review for offensive or manipulative language.")
+                    st.write("Suggestions: Remove or rephrase offensive/manipulative language to maintain a positive brand image and ethical standards.")
+                    compliance_risk = True
                 else:
                     st.success("No harmful content detected.")
+                
+                if compliance_risk:
+                    st.error("Compliance Risk: HIGH (due to PII or Harmful Content)")
+                else:
+                    st.success("Compliance Risk: LOW")
+
         else:
             st.warning("Please enter some ad copies to analyze.")
 
@@ -511,8 +574,14 @@ elif page_selection == "Image Ad Analysis":
                 # --- Textual Bias Analysis (from OCR) ---
                 st.markdown("##### Textual Bias Analysis (from OCR):")
                 text_bias_results = analyze_text_for_bias(extracted_text)
+                
                 if text_bias_results['is_biased']:
-                    st.error(f"Potential Textual Bias Detected: {', '.join(text_bias_results['bias_flags'])}")
+                    st.error("Potential Textual Bias Detected!")
+                    for category, flags in text_bias_results['bias_categories'].items():
+                        if flags:
+                            st.markdown(f"**- {category.replace('_', ' ').title()} Bias:**")
+                            for flag in flags:
+                                st.warning(f"  - {flag}")
                     st.write("Suggestions:", " ".join(text_bias_results['suggestions']))
                     st.metric("Textual Bias Score (0-10)", text_bias_results['bias_score'])
                 else:
@@ -521,11 +590,15 @@ elif page_selection == "Image Ad Analysis":
                 
                 # --- Visual Context Analysis (from Image Captioning) ---
                 st.markdown("##### Visual Context Analysis (from Image Captioning):")
-                # Pass extracted_text to visual analysis for contextual flagging
                 visual_analysis_results = analyze_image_for_visual_context(uploaded_file.getvalue(), extracted_text)
                 
                 if visual_analysis_results['is_visually_biased']:
-                    st.error(f"Potential Visual Bias Detected: {', '.join(visual_analysis_results['visual_flags'])}")
+                    st.error("Potential Visual Bias Detected!")
+                    for category, flags in visual_analysis_results['bias_categories'].items():
+                        if flags:
+                            st.markdown(f"**- {category.replace('_', ' ').title()} Bias:**")
+                            for flag in flags:
+                                st.warning(f"  - {flag}")
                     st.write("Review image for stereotypical depictions based on the generated caption and overall context.")
                     st.metric("Visual Bias Score (0-10)", visual_analysis_results['visual_bias_score'])
                 else:
@@ -542,21 +615,34 @@ elif page_selection == "Image Ad Analysis":
                 st.metric("Combined Bias Score (0-10)", overall_bias_score, help="A higher score indicates more potential bias. This is a simplified score for demonstration.")
                 st.markdown("---")
 
-                # --- Security Checks for Extracted Text ---
-                st.markdown("##### Security Checks (from Extracted Text):")
+                # --- Security Checks and Compliance Risk ---
+                st.markdown("##### Security Checks:")
                 pii_results = check_for_pii(extracted_text)
+                harmful_results = check_for_harmful_content(extracted_text)
+
+                compliance_risk = False
                 if pii_results['has_pii']:
                     st.error(f"PII Detected! Found: {', '.join(pii_results['detected_items'])}. This information should be redacted.")
                     st.write("Suggestions: Remove or redact sensitive personal information before public display.")
+                    compliance_risk = True
                 else:
                     st.success("No Personal Identifiable Information (PII) found.")
 
-                harmful_results = check_for_harmful_content(extracted_text)
                 if harmful_results['has_harmful_content']:
                     st.error(f"Harmful Content Detected! Found: {', '.join(harmful_results['detected_items'])}. Review for offensive or manipulative language.")
                     st.write("Suggestions: Remove or rephrase offensive/manipulative language to maintain a positive brand image and ethical standards.")
+                    compliance_risk = True
                 else:
                     st.success("No harmful content detected.")
+                
+                st.markdown("---")
+                st.subheader("Compliance Risk Summary:")
+                if compliance_risk:
+                    st.error("Compliance Risk: HIGH (due to PII or Harmful Content detected)")
+                    st.write("Action Required: Address detected PII and harmful content immediately to ensure legal and ethical compliance.")
+                else:
+                    st.success("Compliance Risk: LOW (no PII or harmful content detected)")
+                    st.write("Status: Ad content appears to meet basic security and ethical content standards.")
 
     else:
         st.info("Upload an image to start the analysis.")
