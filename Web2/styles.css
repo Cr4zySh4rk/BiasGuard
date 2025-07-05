@@ -1,0 +1,287 @@
+:root {
+    --primary-color: #3498db;
+    --secondary-color: #2ecc71;
+    --danger-color: #e74c3c;
+    --warning-color: #f39c12;
+    --dark-color: #2c3e50;
+    --light-color: #ecf0f1;
+    --gray-color: #95a5a6;
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --border-radius: 8px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background-color: #f5f7fa;
+    color: var(--dark-color);
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 20px;
+    padding: 20px 0;
+    border-bottom: 1px solid #ddd;
+}
+
+header h1 {
+    color: var(--primary-color);
+    margin-bottom: 10px;
+}
+
+.dashboard-nav {
+    margin-bottom: 30px;
+    border-bottom: 1px solid #ddd;
+}
+
+.dashboard-nav ul {
+    display: flex;
+    list-style: none;
+}
+
+.dashboard-nav li {
+    padding: 12px 24px;
+    cursor: pointer;
+    font-weight: 500;
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s;
+}
+
+.dashboard-nav li:hover {
+    color: var(--primary-color);
+}
+
+.dashboard-nav li.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Existing styles from previous CSS... */
+/* (All the existing styles from your styles.css should be included here) */
+
+/* New styles for content analysis */
+.content-analysis-container {
+    background: white;
+    padding: 30px;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+}
+
+.input-method-selector {
+    margin-bottom: 20px;
+}
+
+.input-method-selector label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+
+.input-section-content {
+    margin-bottom: 20px;
+}
+
+.input-section-content label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+
+.input-section-content textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: var(--border-radius);
+    resize: vertical;
+    min-height: 150px;
+}
+
+.image-preview {
+    margin-top: 15px;
+    max-width: 100%;
+    border: 1px dashed #ddd;
+    padding: 10px;
+    text-align: center;
+}
+
+.image-preview img {
+    max-width: 100%;
+    max-height: 300px;
+}
+
+.bias-score-container {
+    text-align: center;
+    margin: 30px 0;
+}
+
+.score-card {
+    display: inline-block;
+    padding: 20px 40px;
+    background: #f8f9fa;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+}
+
+.score-title {
+    font-size: 1.2rem;
+    color: var(--dark-color);
+    margin-bottom: 10px;
+}
+
+.score-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: var(--primary-color);
+    line-height: 1;
+}
+
+.score-description {
+    margin-top: 10px;
+    color: var(--gray-color);
+}
+
+.results-tabs {
+    margin-top: 30px;
+}
+
+.tab-nav {
+    display: flex;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 20px;
+}
+
+.tab-btn {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--dark-color);
+    transition: all 0.3s;
+}
+
+.tab-btn:hover {
+    color: var(--primary-color);
+}
+
+.tab-btn.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+
+.results-tab-content {
+    display: none;
+}
+
+.results-tab-content.active {
+    display: block;
+}
+
+.bias-category {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+}
+
+.bias-category h3 {
+    color: var(--dark-color);
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #ddd;
+}
+
+.bias-item {
+    margin: 10px 0;
+    padding: 10px;
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.bias-item.warning {
+    border-left: 3px solid var(--warning-color);
+}
+
+.bias-item.danger {
+    border-left: 3px solid var(--danger-color);
+}
+
+.security-findings .finding {
+    margin: 15px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+}
+
+.security-findings .finding h4 {
+    margin-bottom: 10px;
+    color: var(--dark-color);
+}
+
+.security-findings .finding ul {
+    margin-left: 20px;
+}
+
+.security-findings .finding.none {
+    background: var(--secondary-color);
+    color: white;
+}
+
+.security-findings .finding.none h4 {
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .dashboard-nav ul {
+        flex-direction: column;
+    }
+    
+    .dashboard-nav li {
+        padding: 10px;
+        border-bottom: 1px solid #ddd;
+        border-left: 3px solid transparent;
+    }
+    
+    .dashboard-nav li.active {
+        border-left-color: var(--primary-color);
+        border-bottom-color: #ddd;
+    }
+    
+    .tab-nav {
+        flex-direction: column;
+    }
+    
+    .tab-btn {
+        border-bottom: none;
+        border-left: 3px solid transparent;
+    }
+    
+    .tab-btn.active {
+        border-bottom: none;
+        border-left-color: var(--primary-color);
+    }
+}

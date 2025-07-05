@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marketing Analytics Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.16.0/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Marketing Analytics Dashboard</h1>
+            <p>Analyze audience segments and content for bias and compliance</p>
+        </header>
+
+        <nav class="dashboard-nav">
+            <ul>
+                <li class="active" data-tab="audience-tab">Audience Analysis</li>
+                <li data-tab="content-tab">Content Analysis</li>
+            </ul>
+        </nav>
+
+        <main>
+            <!-- Audience Analysis Tab -->
+            <section id="audience-tab" class="tab-content active">
+                <div class="upload-section">
+                    <div class="file-upload">
+                        <input type="file" id="csvFile" accept=".csv">
+                        <label for="csvFile">Choose CSV File</label>
+                        <span id="fileName">No file chosen</span>
+                    </div>
+                </div>
+
+                <div class="targeting-section hidden" id="targetingSection">
+                    <h3>Your Target Audience</h3>
+                    
+                    <div class="targeting-group">
+                        <label>Target Gender:</label>
+                        <div class="radio-group">
+                            <label>
+                                <input type="radio" name="gender" value="both" checked> Both
+                            </label>
+                            <label>
+                                <input type="radio" name="gender" value="male"> Male
+                            </label>
+                            <label>
+                                <input type="radio" name="gender" value="female"> Female
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="targeting-group">
+                        <label>Target Age Range:</label>
+                        <div class="range-input">
+                            <input type="number" id="ageMin" placeholder="Min age" min="0" max="100" value="18">
+                            <span>to</span>
+                            <input type="number" id="ageMax" placeholder="Max age" min="0" max="100" value="65">
+                        </div>
+                    </div>
+                    
+                    <button id="analyzeBtn">Analyze Match</button>
+                </div>
+
+                <div class="data-section hidden">
+                    <h2>Targeting Match Analysis</h2>
+                    
+                    <div class="match-score-container">
+                        <div class="match-score">
+                            <div class="score-value" id="overallMatchScore">0%</div>
+                            <div class="score-label">Overall Match Score</div>
+                        </div>
+                        <div class="score-description" id="scoreDescription">
+                            Upload data to see how well it matches your target audience
+                        </div>
+                    </div>
+
+                    <div class="insights-section">
+                        <h3>Detailed Insights</h3>
+                        <div id="insightsContent"></div>
+                    </div>
+
+                    <div class="visualizations-section">
+                        <h3>Data Visualizations</h3>
+                        <div class="charts-container" id="chartsContainer">
+                            <div class="chart-card">
+                                <canvas id="ageChart"></canvas>
+                            </div>
+                            <div class="chart-card">
+                                <canvas id="genderChart"></canvas>
+                            </div>
+                            <div class="chart-card">
+                                <canvas id="locationChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="actions">
+                        <button id="generateReportBtn">Generate Detailed Report</button>
+                    </div>
+                </div>
+
+                <div class="loading-section hidden">
+                    <div class="loader"></div>
+                    <p>Analyzing data match...</p>
+                </div>
+            </section>
+
+            <!-- Content Analysis Tab -->
+            <section id="content-tab" class="tab-content">
+                <div class="content-analysis-container">
+                    <div class="input-section">
+                        <div class="input-method-selector">
+                            <label>Analysis Type:</label>
+                            <div class="radio-group">
+                                <label>
+                                    <input type="radio" name="contentType" value="text" checked> Text
+                                </label>
+                                <label>
+                                    <input type="radio" name="contentType" value="image"> Image
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="textInputSection" class="input-section-content">
+                            <label for="contentText">Enter Marketing Content:</label>
+                            <textarea id="contentText" rows="5" placeholder="Paste your marketing text here..."></textarea>
+                        </div>
+
+                        <div id="imageInputSection" class="input-section-content hidden">
+                            <label for="contentImage">Upload Image:</label>
+                            <input type="file" id="contentImage" accept="image/*">
+                            <div class="image-preview hidden" id="imagePreview"></div>
+                        </div>
+
+                        <button id="analyzeContentBtn">Analyze Content</button>
+                    </div>
+
+                    <div class="results-section hidden" id="contentResults">
+                        <h2>Content Analysis Results</h2>
+                        
+                        <div class="bias-score-container">
+                            <div class="score-card">
+                                <div class="score-title">Overall Bias Score</div>
+                                <div class="score-value" id="overallBiasScore">0/10</div>
+                                <div class="score-description" id="biasScoreDescription"></div>
+                            </div>
+                        </div>
+
+                        <div class="results-tabs">
+                            <div class="tab-nav">
+                                <button class="tab-btn active" data-tab="biasResults">Bias Analysis</button>
+                                <button class="tab-btn" data-tab="securityResults">Security Findings</button>
+                            </div>
+
+                            <div id="biasResults" class="results-tab-content active">
+                                <div class="bias-category-container" id="biasCategories"></div>
+                            </div>
+
+                            <div id="securityResults" class="results-tab-content">
+                                <div class="security-findings" id="securityFindings"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="loading-section hidden" id="contentLoading">
+                        <div class="loader"></div>
+                        <p>Analyzing content...</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Marketing Analytics Dashboard &copy; 2023</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
